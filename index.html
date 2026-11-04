@@ -973,6 +973,15 @@
                         <div class="multiselect-options" id="msSkillOptions"></div>
                     </div>
 
+                    <!-- NUEVO FILTRO MULTI-SELECT DE SUPERVISOR -->
+                    <div class="multiselect" id="msSupervisorContainer">
+                        <div class="multiselect-header" id="msSupervisorHeader">
+                            <span id="msSupervisorText">Todos los Supervisores</span>
+                            <span class="multiselect-arrow">▼</span>
+                        </div>
+                        <div class="multiselect-options" id="msSupervisorOptions"></div>
+                    </div>
+
                 </div>
                 <div id="licenciasStatus" class="licencias-status pending">
                     ⏳ Cargando licencias...
@@ -1054,6 +1063,7 @@
                             <button type="button" data-view="day" class="active">Día</button>
                             <button type="button" data-view="week">Semana</button>
                             <button type="button" data-view="month">Mes</button>
+                            <button type="button" data-view="hour">Horas</button>
                         </div>
                     </div>
                     <div class="chart-canvas-wrap medium">
@@ -1077,6 +1087,7 @@
                             <button type="button" data-view="day" class="active">Día</button>
                             <button type="button" data-view="week">Semana</button>
                             <button type="button" data-view="month">Mes</button>
+                            <button type="button" data-view="hour">Horas</button>
                         </div>
                     </div>
                     <div class="chart-canvas-wrap medium">
@@ -1251,7 +1262,7 @@
                 <div class="chart-card">
                     <div class="chart-card-header">
                         <div class="chart-title promedios-title">
-                            🏅 Ranking de tNPS por asesor
+                           🏅 Ranking de tNPS por asesor
                             <span class="chart-sub">— mejores y peores tNPS</span>
                         </div>
                         <div class="top5-filters">
@@ -1383,11 +1394,11 @@
             </div>
         </div>
     </div>
-        <script>
+            <script>
 (function () {
     "use strict";
 
-    console.log("Comportamiento tNPS - v50 (Filtro Área y Gráfico Cliqueable - ESTABLE)");
+    console.log("Comportamiento tNPS - v54 (Filtro Nesting Removido - ESTABLE)");
 
     var UMBRAL_TNPS = 75;
     var CHUNK_SIZE  = 5000;
@@ -1400,7 +1411,7 @@
     var FILTRO_SITE_INCLUDE = "";
     var FILTRO_CAT_EXCLUDE  = "Spam, Dinamica, Marcado Pendiente, Caso Transferido";
 
-    var EXCLUIR_AGENTES = "leonelj.orellana@clarosv, guillermoemartinez@clarosv";
+    var EXCLUIR_AGENTES = "";
 
     function normalize(str) {
         if (str === null || str === undefined) return "";
@@ -1450,7 +1461,7 @@
     function buildIndexMap() {
         return {
             fecha: 10,      // K
-            hora: 11,       // L
+            hora: 8,        // I  <--- COLUMNA I
             skill: 2,       // C
             operador: 3,    // D
             ans1: 23,       // X
@@ -1521,7 +1532,7 @@
 
     function formatoNota(n) {
         if (n === null || n === undefined || isNaN(n)) return "—";
-        return (n % 1 === 0) ? n.toFixed(0) : n.toFixed(1);
+        return n.toFixed(2);
     }
 
     function clasificarNota(n) {
@@ -1576,9 +1587,6 @@
         return { key: kM, label: meses[m - 1] + " " + y, sortKey: kM };
     }
 
-    /* =========================================================
-       CLASIFICACIÓN DE COMENTARIO POR TIPO (HÍBRIDA v6)
-       ========================================================= */
     function clasificarComentario(comentario) {
         if (!comentario) return { texto: "Sin clasificación", clase: "cat-otro", key: "otro" };
 
@@ -1796,8 +1804,7 @@ var recuperacionesGlobales = [];
 var comentariosCache = [];
 var soloCompletas = false;
 
-// Variables para el filtro multi-select
-var areasSeleccionadas = ["SAC"]; // Por defecto SAC seleccionado
+var areasSeleccionadas = ["SAC"]; 
 var uniqueAreas = new Set();
 var msAreaContainer = document.getElementById("msAreaContainer");
 var msAreaHeader = document.getElementById("msAreaHeader");
@@ -1811,7 +1818,13 @@ var msSkillHeader = document.getElementById("msSkillHeader");
 var msSkillText = document.getElementById("msSkillText");
 var msSkillOptions = document.getElementById("msSkillOptions");
 
-// Variables para el filtro cliqueable de periodo
+var supervisoresSeleccionados = []; 
+var uniqueSupervisores = new Set();
+var msSupervisorContainer = document.getElementById("msSupervisorContainer");
+var msSupervisorHeader = document.getElementById("msSupervisorHeader");
+var msSupervisorText = document.getElementById("msSupervisorText");
+var msSupervisorOptions = document.getElementById("msSupervisorOptions");
+
 var periodoSeleccionadoKey = "";
 var periodoSeleccionadoLabel = "";
 var vistaFiltroPeriodo = "day";
@@ -1964,7 +1977,6 @@ function toggleSwitchCompletas() {
     if (filasEnMemoria.length > 0) agregarYRenderizar();
 }
 
-// Lógica del Multi-Select de Área
 msAreaHeader.addEventListener("click", function(e) {
     e.stopPropagation();
     msAreaContainer.classList.toggle("open");
@@ -2032,7 +2044,6 @@ function actualizarTextoFiltroArea() {
     }
 }
 
-// Lógica del Multi-Select de Skill
 msSkillHeader.addEventListener("click", function(e) {
     e.stopPropagation();
     msSkillContainer.classList.toggle("open");
@@ -2101,7 +2112,74 @@ function actualizarTextoFiltroSkill() {
     }
 }
 
-// Lógica del Filtro de Periodo Cliqueable
+msSupervisorHeader.addEventListener("click", function(e) {
+    e.stopPropagation();
+    msSupervisorContainer.classList.toggle("open");
+});
+
+document.addEventListener("click", function(e) {
+    if (!msSupervisorContainer.contains(e.target)) {
+        msSupervisorContainer.classList.remove("open");
+    }
+});
+
+function actualizarFiltroSupervisor() {
+    uniqueSupervisores.clear();
+    for (var i = 0; i < filasEnMemoria.length; i++) {
+        if (filasEnMemoria[i].supervisor && filasEnMemoria[i].supervisor.trim() !== "") {
+            uniqueSupervisores.add(filasEnMemoria[i].supervisor);
+        }
+    }
+    
+    var lista = Array.from(uniqueSupervisores).sort();
+    msSupervisorOptions.innerHTML = "";
+    
+    if (lista.length === 0) {
+        msSupervisorOptions.innerHTML = '<div style="padding: 10px; font-size: 11px; color: #999;">Sin supervisores disponibles</div>';
+        return;
+    }
+
+    for (var i = 0; i < lista.length; i++) {
+        var sup = lista[i];
+        var item = document.createElement("div");
+        item.className = "multiselect-item";
+        
+        var input = document.createElement("input");
+        input.type = "checkbox";
+        input.value = sup;
+        input.id = "sup_" + normalize(sup);
+        input.checked = supervisoresSeleccionados.indexOf(sup) !== -1;
+        
+        input.addEventListener("change", function() {
+            if (this.checked) {
+                supervisoresSeleccionados.push(this.value);
+            } else {
+                supervisoresSeleccionados = supervisoresSeleccionados.filter(function(s) { return s !== this.value; }.bind(this));
+            }
+            actualizarTextoFiltroSupervisor();
+            if (filasEnMemoria.length > 0) agregarYRenderizar();
+        });
+
+        var label = document.createElement("label");
+        label.htmlFor = input.id;
+        label.textContent = sup;
+        
+        item.appendChild(input);
+        item.appendChild(label);
+        msSupervisorOptions.appendChild(item);
+    }
+}
+
+function actualizarTextoFiltroSupervisor() {
+    if (supervisoresSeleccionados.length === 0) {
+        msSupervisorText.textContent = "Todos los Supervisores";
+    } else if (supervisoresSeleccionados.length === 1) {
+        msSupervisorText.textContent = supervisoresSeleccionados[0];
+    } else {
+        msSupervisorText.textContent = supervisoresSeleccionados.length + " Supervisores";
+    }
+}
+
 filtroPeriodoBannerEl.style.display = "none";
 
 btnQuitarFiltroPeriodoEl.addEventListener("click", function() {
@@ -2134,10 +2212,7 @@ viewSwitchEl.addEventListener("click", function(e){
     for (var i = 0; i < botones.length; i++) botones[i].classList.remove("active");
     btn.classList.add("active");
     vistaActual = nuevaVista;
-    
-    // Limpiar filtro de periodo si cambia la vista
     clearFiltroPeriodo(false); 
-    
     renderGraficoBarras();
 });
 
@@ -2285,13 +2360,14 @@ function calcularPeriodosDisponibles(filas) {
     });
     periodosDisponibles = { meses: meses, semanas: semanas };
 }
-
 function agregarYRenderizar() {
     // Actualizar filtros visuales
     actualizarFiltroArea();
     actualizarTextoFiltroArea();
     actualizarFiltroSkill();
     actualizarTextoFiltroSkill();
+    actualizarFiltroSupervisor();
+    actualizarTextoFiltroSupervisor();
 
     var areasOk = areasSeleccionadas.length > 0 ? areasSeleccionadas.map(normalize) : AREAS_INCLUIDAS;
     var sites = SITES_INCLUIDOS, cats = CATS_EXCLUIDAS;
@@ -2311,6 +2387,11 @@ function agregarYRenderizar() {
         // FILTRO MULTI-SELECT DE SKILL
         if (skillsSeleccionados.length > 0 && skillsSeleccionados.indexOf(f.skill) === -1) continue;
 
+        // FILTRO MULTI-SELECT DE SUPERVISOR (Sin exclusiones por defecto)
+        if (supervisoresSeleccionados.length > 0 && supervisoresSeleccionados.indexOf(f.supervisor) === -1) {
+            continue;
+        }
+
         // FILTRO MULTI-SELECT DE ÁREA (Cambiado a igualdad exacta para no mezclar SAC con SAC-CORP)
         if (areasOk.length > 0) {
             var okA = false;
@@ -2320,8 +2401,8 @@ function agregarYRenderizar() {
             if (!okA) continue;
         }
 
-        if (agentesExcluidos.size > 0 && agentesExcluidos.has(f.operadorLower)) continue;
-        if (filtroAsesorNormLocal !== "" && f.operadorNorm !== filtroAsesorNormLocal) continue;
+        // if (agentesExcluidos.size > 0 && agentesExcluidos.has(f.operadorLower)) continue;
+if (filtroAsesorNormLocal !== "" && f.operadorNorm !== filtroAsesorNormLocal) continue;
 
         if (sites.length > 0) {
             var okS = false;
@@ -2511,7 +2592,7 @@ function renderGraficoBarSkills() {
                     color: '#1F1F1F', font: { weight: 'bold', size: 12 },
                     formatter: function(value) {
                         var total = data.reduce((a, b) => a + b, 0);
-                        var pct = ((value / total) * 100).toFixed(1);
+                        var pct = ((value / total) * 100).toFixed(2);
                         return value + " (" + pct + "%)";
                     }
                 },
@@ -2519,7 +2600,7 @@ function renderGraficoBarSkills() {
                     callbacks: {
                         label: function(ctx) {
                             var total = data.reduce((a, b) => a + b, 0);
-                            var pct = ((ctx.parsed.x / total) * 100).toFixed(1);
+                            var pct = ((ctx.parsed.x / total) * 100).toFixed(2);
                             return ctx.parsed.x + " detractores (" + pct + "%)";
                         }
                     }
@@ -2639,7 +2720,7 @@ function renderGraficoCategoriasComentarios() {
                     callbacks: {
                         label: function(ctx) {
                             var total = data.reduce((a, b) => a + b, 0);
-                            var pct = ((ctx.parsed.x / total) * 100).toFixed(1);
+                            var pct = ((ctx.parsed.x / total) * 100).toFixed(2);
                             return ctx.parsed.x + " casos (" + pct + "%)";
                         },
                         afterLabel: function(ctx) {
@@ -2655,570 +2736,566 @@ function renderGraficoCategoriasComentarios() {
         }
     });
 }
+function renderComentarios() {
+    var filtro = filtroAplicaEl.value;
+    var fi = comentFechaInicioEl.value;
+    var ff = comentFechaFinEl.value;
 
-// CONTINÚA EN LA PARTE 2...
+    var enRango = comentariosCache;
+    if (fi || ff) {
+        enRango = comentariosCache.filter(function(c) {
+            if (!c.fecha) return false;
+            if (fi && c.fecha < fi) return false;
+            if (ff && c.fecha > ff) return false;
+            return true;
+        });
+    }
 
-    function renderComentarios() {
-        var filtro = filtroAplicaEl.value;
-        var fi = comentFechaInicioEl.value;
-        var ff = comentFechaFinEl.value;
+    var conteoSi = 0, conteoNo = 0;
+    for (var i = 0; i < enRango.length; i++) {
+        if (enRango[i].aplicaAsesor === "Sí") conteoSi++;
+        else conteoNo++;
+    }
+    totalComentariosEl.textContent = enRango.length;
+    totalAplicaSiEl.textContent = conteoSi;
+    totalAplicaNoEl.textContent = conteoNo;
 
-        var enRango = comentariosCache;
-        if (fi || ff) {
-            enRango = comentariosCache.filter(function(c) {
-                if (!c.fecha) return false;
-                if (fi && c.fecha < fi) return false;
-                if (ff && c.fecha > ff) return false;
-                return true;
-            });
-        }
+    var filtrados = enRango;
+    if (filtro === "si") filtrados = enRango.filter(function(c){ return c.aplicaAsesor === "Sí"; });
+    else if (filtro === "no") filtrados = enRango.filter(function(c){ return c.aplicaAsesor === "No"; });
 
-        var conteoSi = 0, conteoNo = 0;
-        for (var i = 0; i < enRango.length; i++) {
-            if (enRango[i].aplicaAsesor === "Sí") conteoSi++;
-            else conteoNo++;
-        }
-        totalComentariosEl.textContent = enRango.length;
-        totalAplicaSiEl.textContent = conteoSi;
-        totalAplicaNoEl.textContent = conteoNo;
-
-        var filtrados = enRango;
-        if (filtro === "si") filtrados = enRango.filter(function(c){ return c.aplicaAsesor === "Sí"; });
-        else if (filtro === "no") filtrados = enRango.filter(function(c){ return c.aplicaAsesor === "No"; });
-
-        if (filtrados.length === 0) {
-            commentTableContainerEl.innerHTML = '<div class="comment-empty">Sin comentarios con los filtros aplicados</div>';
-            renderTopAsesoresAplica();
-            renderGraficoCategoriasComentarios();
-            return;
-        }
-
-        var html = '<table class="comment-table" id="commentTable">';
-        html += '<thead><tr>';
-        html += '<th style="width:110px;">Fecha</th>';
-        html += '<th style="width:80px;">Hora</th>';
-        html += '<th style="width:170px;">Agente</th>';
-        html += '<th style="width:130px;">ID Usuario</th>';
-        html += '<th style="width:150px;">Supervisor</th>';
-        html += '<th style="width:120px;">Skill</th>';
-        html += '<th>Comentario</th>';
-        html += '<th style="width:100px;">Nota</th>';
-        html += '<th style="width:140px;">Categoría</th>';
-        html += '<th style="width:120px;">Aplica asesor</th>';
-        html += '</tr></thead><tbody>';
-
-        for (var j = 0; j < filtrados.length; j++) {
-            var c = filtrados[j];
-            var claseAplica = c.aplicaAsesor === "Sí" ? "si" : "no";
-            var claseNota = clasificarNota(c.nota);
-            html += '<tr>';
-            html += '<td class="comment-fecha">' + formatoFecha(c.fecha) + '</td>';
-            html += '<td class="comment-hora">' + formatoHora(c.hora) + '</td>';
-            html += '<td class="comment-agente">' + escapeHtml(c.agente || "(Sin nombre)") + '</td>';
-            html += '<td class="comment-id">' + escapeHtml(c.idUsuario || "—") + '</td>';
-            html += '<td class="comment-supervisor">' + escapeHtml(c.supervisor || "(Sin Supervisor)") + '</td>';
-            html += '<td class="comment-skill">' + escapeHtml(c.skill || "—") + '</td>';
-            html += '<td class="comment-texto">' + escapeHtml(c.comentario) + '</td>';
-            html += '<td><span class="nota-badge ' + claseNota + '">' + formatoNota(c.nota) + '</span></td>';
-            html += '<td><span class="cat-badge ' + c.categoriaComentario.clase + '">' + c.categoriaComentario.texto + '</span></td>';
-            html += '<td><span class="comment-aplica ' + claseAplica + '">' + c.aplicaAsesor + '</span></td>';
-            html += '</tr>';
-        }
-        html += '</tbody></table>';
-        commentTableContainerEl.innerHTML = html;
-
+    if (filtrados.length === 0) {
+        commentTableContainerEl.innerHTML = '<div class="comment-empty">Sin comentarios con los filtros aplicados</div>';
         renderTopAsesoresAplica();
         renderGraficoCategoriasComentarios();
+        return;
     }
 
-    function renderTopAsesoresAplica() {
-        if (chartTopAsesoresInstance) {
-            try { chartTopAsesoresInstance.destroy(); } catch(e){}
-            chartTopAsesoresInstance = null;
-        }
+    var html = '<table class="comment-table" id="commentTable">';
+    html += '<thead><tr>';
+    html += '<th style="width:110px;">Fecha</th>';
+    html += '<th style="width:80px;">Hora</th>';
+    html += '<th style="width:170px;">Agente</th>';
+    html += '<th style="width:130px;">ID Usuario</th>';
+    html += '<th style="width:150px;">Supervisor</th>';
+    html += '<th style="width:120px;">Skill</th>';
+    html += '<th>Comentario</th>';
+    html += '<th style="width:100px;">Nota</th>';
+    html += '<th style="width:140px;">Categoría</th>';
+    html += '<th style="width:120px;">Aplica asesor</th>';
+    html += '</tr></thead><tbody>';
 
-        var fi = comentFechaInicioEl.value;
-        var ff = comentFechaFinEl.value;
+    for (var j = 0; j < filtrados.length; j++) {
+        var c = filtrados[j];
+        var claseAplica = c.aplicaAsesor === "Sí" ? "si" : "no";
+        var claseNota = clasificarNota(c.nota);
+        html += '<tr>';
+        html += '<td class="comment-fecha">' + formatoFecha(c.fecha) + '</td>';
+        html += '<td class="comment-hora">' + formatoHora(c.hora) + '</td>';
+        html += '<td class="comment-agente">' + escapeHtml(c.agente || "(Sin nombre)") + '</td>';
+        html += '<td class="comment-id">' + escapeHtml(c.idUsuario || "—") + '</td>';
+        html += '<td class="comment-supervisor">' + escapeHtml(c.supervisor || "(Sin Supervisor)") + '</td>';
+        html += '<td class="comment-skill">' + escapeHtml(c.skill || "—") + '</td>';
+        html += '<td class="comment-texto">' + escapeHtml(c.comentario) + '</td>';
+        html += '<td><span class="nota-badge ' + claseNota + '">' + formatoNota(c.nota) + '</span></td>';
+        html += '<td><span class="cat-badge ' + c.categoriaComentario.clase + '">' + c.categoriaComentario.texto + '</span></td>';
+        html += '<td><span class="comment-aplica ' + claseAplica + '">' + c.aplicaAsesor + '</span></td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    commentTableContainerEl.innerHTML = html;
 
-        var base = comentariosCache;
-        if (fi || ff) {
-            base = base.filter(function(c) {
-                if (!c.fecha) return false;
-                if (fi && c.fecha < fi) return false;
-                if (ff && c.fecha > ff) return false;
-                return true;
-            });
-        }
+    renderTopAsesoresAplica();
+    renderGraficoCategoriasComentarios();
+}
 
-        var conteo = {};
-        for (var i = 0; i < base.length; i++) {
-            var c = base[i];
-            if (c.aplicaAsesor !== "Sí") continue;
-            var key = c.agente || "(Sin nombre)";
-            if (!conteo[key]) conteo[key] = { agente: c.agente || "(Sin nombre)", count: 0, supervisor: c.supervisor };
-            conteo[key].count++;
-        }
-        var lista = [];
-        for (var k in conteo) lista.push(conteo[k]);
-        if (lista.length === 0) {
-            chartTopAsesoresEmptyEl.style.display = "flex";
-        } else {
-            lista.sort(function(a, b){ return b.count - a.count; });
-            var top5 = lista.slice(0, 5);
-            chartTopAsesoresEmptyEl.style.display = "none";
-            var labels = top5.map(function(a){ return a.agente; });
-            var values = top5.map(function(a){ return a.count; });
-            var supervisores = top5.map(function(a){ return a.supervisor || "(Sin Supervisor)"; });
-            var colores = ["#E91E63", "#F06292", "#F48FB1", "#F8BBD0", "#FCE4EC"];
+function renderTopAsesoresAplica() {
+    if (chartTopAsesoresInstance) {
+        try { chartTopAsesoresInstance.destroy(); } catch(e){}
+        chartTopAsesoresInstance = null;
+    }
 
-            chartTopAsesoresInstance = new Chart(chartTopAsesoresCanvas, {
-                type: "bar",
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: "Casos Sí aplica",
-                        data: values,
-                        backgroundColor: colores.slice(0, top5.length),
-                       borderColor: colores.slice(0, top5.length),
-                        borderRadius: 6,
-                        borderSkipped: false,
-                        maxBarThickness: 46
-                    }]
+    var fi = comentFechaInicioEl.value;
+    var ff = comentFechaFinEl.value;
+
+    var base = comentariosCache;
+    if (fi || ff) {
+        base = base.filter(function(c) {
+            if (!c.fecha) return false;
+            if (fi && c.fecha < fi) return false;
+            if (ff && c.fecha > ff) return false;
+            return true;
+        });
+    }
+
+    var conteo = {};
+    for (var i = 0; i < base.length; i++) {
+        var c = base[i];
+        if (c.aplicaAsesor !== "Sí") continue;
+        var key = c.agente || "(Sin nombre)";
+        if (!conteo[key]) conteo[key] = { agente: c.agente || "(Sin nombre)", count: 0, supervisor: c.supervisor };
+        conteo[key].count++;
+    }
+    var lista = [];
+    for (var k in conteo) lista.push(conteo[k]);
+    if (lista.length === 0) {
+        chartTopAsesoresEmptyEl.style.display = "flex";
+    } else {
+        lista.sort(function(a, b){ return b.count - a.count; });
+        var top5 = lista.slice(0, 5);
+        chartTopAsesoresEmptyEl.style.display = "none";
+        var labels = top5.map(function(a){ return a.agente; });
+        var values = top5.map(function(a){ return a.count; });
+        var supervisores = top5.map(function(a){ return a.supervisor || "(Sin Supervisor)"; });
+        var colores = ["#E91E63", "#F06292", "#F48FB1", "#F8BBD0", "#FCE4EC"];
+
+        chartTopAsesoresInstance = new Chart(chartTopAsesoresCanvas, {
+            type: "bar",
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: "Casos Sí aplica",
+                    data: values,
+                    backgroundColor: colores.slice(0, top5.length),
+                   borderColor: colores.slice(0, top5.length),
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    maxBarThickness: 46
+                }]
+            },
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400 },
+                layout: { padding: { right: 60, left: 10 } },
+                onClick: function(event, elements) {
+                    if (elements.length > 0) {
+                        var idx = elements[0].index;
+                        var nombreAsesor = chartTopAsesoresInstance.data.labels[idx];
+                        abrirModalAsesorCasos(nombreAsesor);
+                    }
                 },
-                options: {
-                    indexAxis: "y",
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 400 },
-                    layout: { padding: { right: 60, left: 10 } },
-                    onClick: function(event, elements) {
-                        if (elements.length > 0) {
-                            var idx = elements[0].index;
-                            var nombreAsesor = chartTopAsesoresInstance.data.labels[idx];
-                            abrirModalAsesorCasos(nombreAsesor);
-                        }
+                onHover: function(event, elements) {
+                    event.native.target.style.cursor = elements.length > 0 ? "pointer" : "default";
+                },
+                plugins: {
+                    legend: { display: false },
+                    datalabels: {
+                        anchor: "end", align: "right", offset: 6,
+                        color: "#1F1F1F",
+                        font: { size: 13, weight: "800", family: "Segoe UI, Arial" },
+                        formatter: function(value) { return value + (value === 1 ? " caso" : " casos"); }
                     },
-                    onHover: function(event, elements) {
-                        event.native.target.style.cursor = elements.length > 0 ? "pointer" : "default";
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        datalabels: {
-                            anchor: "end", align: "right", offset: 6,
-                            color: "#1F1F1F",
-                            font: { size: 13, weight: "800", family: "Segoe UI, Arial" },
-                            formatter: function(value) { return value + (value === 1 ? " caso" : " casos"); }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                title: function(items) { return items[0].label; },
-                                label: function(ctx) { return "Casos Sí aplica: " + ctx.parsed.x; },
-                                afterLabel: function(ctx) {
-                                    var extra = ["Supervisor: " + supervisores[ctx.dataIndex]];
-                                    extra.push("(clic para ver el detalle)");
-                                    return extra;
-                                }
+                    tooltip: {
+                        callbacks: {
+                            title: function(items) { return items[0].label; },
+                            label: function(ctx) { return "Casos Sí aplica: " + ctx.parsed.x; },
+                            afterLabel: function(ctx) {
+                                var extra = ["Supervisor: " + supervisores[ctx.dataIndex]];
+                                extra.push("(clic para ver el detalle)");
+                                return extra;
                             }
                         }
-                    },
-                    scales: {
-                        x: { beginAtZero: true, grid: { color: "#F0F0F0" }, ticks: { font: { size: 10 }, color: "#6B6B6B", precision: 0, stepSize: 1 } },
-                        y: { grid: { display: false }, ticks: { font: { size: 11, weight: "600" }, color: "#1F1F1F", autoSkip: false } }
                     }
+                },
+                scales: {
+                    x: { beginAtZero: true, grid: { color: "#F0F0F0" }, ticks: { font: { size: 10 }, color: "#6B6B6B", precision: 0, stepSize: 1 } },
+                    y: { grid: { display: false }, ticks: { font: { size: 11, weight: "600" }, color: "#1F1F1F", autoSkip: false } }
                 }
-            });
-        }
-
-        var porFecha = {};
-        for (var m = 0; m < base.length; m++) {
-            var cm = base[m];
-            if (cm.aplicaAsesor !== "Sí") continue;
-            if (!cm.fecha) continue;
-            if (!porFecha[cm.fecha]) porFecha[cm.fecha] = 0;
-            porFecha[cm.fecha]++;
-        }
-
-        var listaFechas = [];
-        for (var fk in porFecha) {
-            listaFechas.push({ fecha: fk, count: porFecha[fk] });
-        }
-        listaFechas.sort(function(a, b){ return b.count - a.count; });
-        var top5Fechas = listaFechas.slice(0, 5);
-
-        if (top5Fechas.length === 0) {
-            top5FechasContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            return;
-        }
-
-        var maxCountFechas = top5Fechas[0].count || 1;
-        var htmlFechas = '<table class="fechas-table"><thead><tr>';
-        htmlFechas += '<th style="width:32px;text-align:center;">#</th>';
-        htmlFechas += '<th>Fecha</th>';
-        htmlFechas += '<th style="width:100px;text-align:center;">Casos</th>';
-        htmlFechas += '<th style="width:200px;">Volumen relativo</th>';
-        htmlFechas += '</tr></thead><tbody>';
-
-        for (var t = 0; t < top5Fechas.length; t++) {
-            var item = top5Fechas[t];
-            var pct = maxCountFechas > 0 ? (item.count / maxCountFechas) * 100 : 0;
-
-            htmlFechas += '<tr data-fecha="' + escapeHtml(item.fecha) + '" style="cursor:pointer;">';
-            htmlFechas += '<td class="fechas-rank">' + (t + 1) + '</td>';
-            htmlFechas += '<td class="fechas-fecha">' + escapeHtml(formatoFecha(item.fecha)) + '</td>';
-            htmlFechas += '<td class="fechas-cantidad">' + item.count + (item.count === 1 ? ' caso' : ' casos') + '</td>';
-            htmlFechas += '<td><div class="fechas-barra-wrap"><div class="fechas-barra-fill" style="width:' + pct + '%;"></div></div></td>';
-            htmlFechas += '</tr>';
-        }
-        htmlFechas += '</tbody></table>';
-        top5FechasContainerEl.innerHTML = htmlFechas;
-
-        var filasFechas = top5FechasContainerEl.querySelectorAll("tr[data-fecha]");
-        for (var n = 0; n < filasFechas.length; n++) {
-            filasFechas[n].addEventListener("click", function() {
-                var fecha = this.getAttribute("data-fecha");
-                abrirModalFechaCasos(fecha);
-            });
-        }
-    }
-
-    function renderEncuestasPorAsesor() {
-        var porAgente = {};
-        for (var i = 0; i < filasFiltradasCache.length; i++) {
-            var f = filasFiltradasCache[i];
-            if (!f.operadorNorm) continue;
-
-            if (!porAgente[f.operadorNorm]) {
-                porAgente[f.operadorNorm] = {
-                    nombre: f.operador,
-                    supervisor: f.supervisor || "(Sin Supervisor)",
-                    count: 0
-                };
             }
-            porAgente[f.operadorNorm].count++;
-        }
-
-        var lista = [];
-        for (var k in porAgente) lista.push(porAgente[k]);
-
-        if (lista.length === 0) {
-            encuestasStatsEl.innerHTML = "";
-            encuestasTableContainerEl.innerHTML = '<div class="comment-empty">Sin datos</div>';
-            return;
-        }
-
-        var orden = filtroEncuestasOrdenEl.value;
-        lista.sort(function(a, b) {
-            return orden === "asc" ? a.count - b.count : b.count - a.count;
         });
-
-        var totalAgentes = lista.length;
-        var totalEncuestas = 0;
-        for (var j = 0; j < lista.length; j++) totalEncuestas += lista[j].count;
-
-        var conteos = lista.map(function(a){ return a.count; }).slice().sort(function(a,b){ return a-b; });
-        var mediana = 0;
-        if (conteos.length > 0) {
-            var mid = Math.floor(conteos.length / 2);
-            mediana = (conteos.length % 2 !== 0)
-                ? conteos[mid]
-                : (conteos[mid - 1] + conteos[mid]) / 2;
-        }
-
-        var maxCount = conteos[conteos.length - 1] || 1;
-
-        var umbralCritico = Math.max(1, Math.floor(mediana * 0.3));
-        var umbralBajo    = Math.max(2, Math.floor(mediana * 0.6));
-        var umbralNormal  = mediana;
-
-        var agentesCriticos = lista.filter(function(a){ return a.count <= umbralCritico; }).length;
-        var agentesBajos    = lista.filter(function(a){ return a.count > umbralCritico && a.count <= umbralBajo; }).length;
-
-        var statHtml = "";
-        statHtml += '<div class="encuestas-stat">';
-        statHtml += '<span class="encuestas-stat-label">Total asesores</span>';
-        statHtml += '<span class="encuestas-stat-value">' + totalAgentes + '</span>';
-        statHtml += '<span class="encuestas-stat-sub">' + totalEncuestas.toLocaleString() + ' encuestas totales</span>';
-        statHtml += '</div>';
-
-        statHtml += '<div class="encuestas-stat">';
-        statHtml += '<span class="encuestas-stat-label">Mediana del grupo</span>';
-        statHtml += '<span class="encuestas-stat-value">' + mediana.toFixed(1) + '</span>';
-        statHtml += '<span class="encuestas-stat-sub">encuestas por asesor</span>';
-        statHtml += '</div>';
-
-        statHtml += '<div class="encuestas-stat stat-critico">';
-        statHtml += '<span class="encuestas-stat-label">🔴 Críticos</span>';
-        statHtml += '<span class="encuestas-stat-value">' + agentesCriticos + '</span>';
-        statHtml += '<span class="encuestas-stat-sub">≤ ' + umbralCritico + ' encuestas</span>';
-        statHtml += '</div>';
-
-        statHtml += '<div class="encuestas-stat stat-bajo">';
-        statHtml += '<span class="encuestas-stat-label">🟠 Bajos</span>';
-        statHtml += '<span class="encuestas-stat-value">' + agentesBajos + '</span>';
-        statHtml += '<span class="encuestas-stat-sub">≤ ' + umbralBajo + ' encuestas</span>';
-        statHtml += '</div>';
-
-        encuestasStatsEl.innerHTML = statHtml;
-
-        var html = '<table class="encuestas-table">';
-        html += '<thead><tr>';
-        html += '<th style="width:50px;text-align:center;">#</th>';
-        html += '<th style="width:240px;">Agente</th>';
-        html += '<th style="width:180px;">Supervisor</th>';
-        html += '<th style="width:100px;text-align:center;">Encuestas</th>';
-        html += '<th style="width:200px;">Volumen relativo</th>';
-        html += '<th style="width:130px;">Estado</th>';
-        html += '</tr></thead><tbody>';
-
-        var filtroAsesorNormLocal = asesorFiltroNorm;
-
-        for (var t2 = 0; t2 < lista.length; t2++) {
-            var a = lista[t2];
-            var pct = maxCount > 0 ? (a.count / maxCount) * 100 : 0;
-
-           var estado, estadoClase, colorBarra;
-            if (a.count <= umbralCritico) {
-                estado = "Crítico"; estadoClase = "critico"; colorBarra = "#DC3545";
-            } else if (a.count <= umbralBajo) {
-                estado = "Bajo"; estadoClase = "bajo"; colorBarra = "#FD7E14";
-            } else if (a.count <= umbralNormal) {
-                estado = "Normal"; estadoClase = "normal"; colorBarra = "#FFC107";
-            } else {
-                estado = "Alto"; estadoClase = "alto"; colorBarra = "#28A745";
-            }
-
-            var esActiva = (filtroAsesorNormLocal !== "" && normalize(a.nombre) === filtroAsesorNormLocal);
-            html += '<tr data-asesor="' + escapeHtml(a.nombre) + '"' + (esActiva ? ' class="fila-activa"' : '') + '>';
-            html += '<td class="encuestas-rank">' + (t2 + 1) + '</td>';
-            html += '<td class="encuestas-agente">' + escapeHtml(a.nombre) + '</td>';
-            html += '<td class="encuestas-supervisor">' + escapeHtml(a.supervisor) + '</td>';
-            html += '<td class="encuestas-cantidad">' + a.count + '</td>';
-            html += '<td><div class="encuestas-barra-wrap"><div class="encuestas-barra-fill" style="width:' + pct + '%;background:' + colorBarra + ';"></div></div></td>';
-            html += '<td><span class="encuestas-estado ' + estadoClase + '">' + estado + '</span></td>';
-            html += '</tr>';
-        }
-
-        html += '</tbody></table>';
-        encuestasTableContainerEl.innerHTML = html;
-
-        var filas = encuestasTableContainerEl.querySelectorAll("tr[data-asesor]");
-        for (var f = 0; f < filas.length; f++) {
-            filas[f].addEventListener("click", function() {
-                var nombre = this.getAttribute("data-asesor");
-                toggleFiltroAsesor(nombre);
-            });
-        }
     }
 
-    function toggleFiltroAsesor(nombre) {
-        if (asesorFiltroActual === nombre) {
-            asesorFiltroActual = "";
-            asesorFiltroNorm = "";
+    var porFecha = {};
+    for (var m = 0; m < base.length; m++) {
+        var cm = base[m];
+        if (cm.aplicaAsesor !== "Sí") continue;
+        if (!cm.fecha) continue;
+        if (!porFecha[cm.fecha]) porFecha[cm.fecha] = 0;
+        porFecha[cm.fecha]++;
+    }
+
+    var listaFechas = [];
+    for (var fk in porFecha) {
+        listaFechas.push({ fecha: fk, count: porFecha[fk] });
+    }
+    listaFechas.sort(function(a, b){ return b.count - a.count; });
+    var top5Fechas = listaFechas.slice(0, 5);
+
+    if (top5Fechas.length === 0) {
+        top5FechasContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        return;
+    }
+
+    var maxCountFechas = top5Fechas[0].count || 1;
+    var htmlFechas = '<table class="fechas-table"><thead><tr>';
+    htmlFechas += '<th style="width:32px;text-align:center;">#</th>';
+    htmlFechas += '<th>Fecha</th>';
+    htmlFechas += '<th style="width:100px;text-align:center;">Casos</th>';
+    htmlFechas += '<th style="width:200px;">Volumen relativo</th>';
+    htmlFechas += '</tr></thead><tbody>';
+
+    for (var t = 0; t < top5Fechas.length; t++) {
+        var item = top5Fechas[t];
+        var pct = maxCountFechas > 0 ? (item.count / maxCountFechas) * 100 : 0;
+
+        htmlFechas += '<tr data-fecha="' + escapeHtml(item.fecha) + '" style="cursor:pointer;">';
+        htmlFechas += '<td class="fechas-rank">' + (t + 1) + '</td>';
+        htmlFechas += '<td class="fechas-fecha">' + escapeHtml(formatoFecha(item.fecha)) + '</td>';
+        htmlFechas += '<td class="fechas-cantidad">' + item.count + (item.count === 1 ? ' caso' : ' casos') + '</td>';
+        htmlFechas += '<td><div class="fechas-barra-wrap"><div class="fechas-barra-fill" style="width:' + pct + '%;"></div></div></td>';
+        htmlFechas += '</tr>';
+    }
+    htmlFechas += '</tbody></table>';
+    top5FechasContainerEl.innerHTML = htmlFechas;
+
+    var filasFechas = top5FechasContainerEl.querySelectorAll("tr[data-fecha]");
+    for (var n = 0; n < filasFechas.length; n++) {
+        filasFechas[n].addEventListener("click", function() {
+            var fecha = this.getAttribute("data-fecha");
+            abrirModalFechaCasos(fecha);
+        });
+    }
+}
+
+function renderEncuestasPorAsesor() {
+    var porAgente = {};
+    for (var i = 0; i < filasFiltradasCache.length; i++) {
+        var f = filasFiltradasCache[i];
+        if (!f.operadorNorm) continue;
+
+        if (!porAgente[f.operadorNorm]) {
+            porAgente[f.operadorNorm] = {
+                nombre: f.operador,
+                supervisor: f.supervisor || "(Sin Supervisor)",
+                count: 0
+            };
+        }
+        porAgente[f.operadorNorm].count++;
+    }
+
+    var lista = [];
+    for (var k in porAgente) lista.push(porAgente[k]);
+
+    if (lista.length === 0) {
+        encuestasStatsEl.innerHTML = "";
+        encuestasTableContainerEl.innerHTML = '<div class="comment-empty">Sin datos</div>';
+        return;
+    }
+
+    var orden = filtroEncuestasOrdenEl.value;
+    lista.sort(function(a, b) {
+        return orden === "asc" ? a.count - b.count : b.count - a.count;
+    });
+
+    var totalAgentes = lista.length;
+    var totalEncuestas = 0;
+    for (var j = 0; j < lista.length; j++) totalEncuestas += lista[j].count;
+
+    var conteos = lista.map(function(a){ return a.count; }).slice().sort(function(a,b){ return a-b; });
+    var mediana = 0;
+    if (conteos.length > 0) {
+        var mid = Math.floor(conteos.length / 2);
+        mediana = (conteos.length % 2 !== 0)
+            ? conteos[mid]
+            : (conteos[mid - 1] + conteos[mid]) / 2;
+    }
+
+    var maxCount = conteos[conteos.length - 1] || 1;
+
+    var umbralCritico = Math.max(1, Math.floor(mediana * 0.3));
+    var umbralBajo    = Math.max(2, Math.floor(mediana * 0.6));
+    var umbralNormal  = mediana;
+
+    var agentesCriticos = lista.filter(function(a){ return a.count <= umbralCritico; }).length;
+    var agentesBajos    = lista.filter(function(a){ return a.count > umbralCritico && a.count <= umbralBajo; }).length;
+
+    var statHtml = "";
+    statHtml += '<div class="encuestas-stat">';
+    statHtml += '<span class="encuestas-stat-label">Total asesores</span>';
+    statHtml += '<span class="encuestas-stat-value">' + totalAgentes + '</span>';
+    statHtml += '<span class="encuestas-stat-sub">' + totalEncuestas.toLocaleString() + ' encuestas totales</span>';
+    statHtml += '</div>';
+
+    statHtml += '<div class="encuestas-stat">';
+    statHtml += '<span class="encuestas-stat-label">Mediana del grupo</span>';
+    statHtml += '<span class="encuestas-stat-value">' + mediana.toFixed(2) + '</span>';
+    statHtml += '<span class="encuestas-stat-sub">encuestas por asesor</span>';
+    statHtml += '</div>';
+
+    statHtml += '<div class="encuestas-stat stat-critico">';
+    statHtml += '<span class="encuestas-stat-label">🔴 Críticos</span>';
+    statHtml += '<span class="encuestas-stat-value">' + agentesCriticos + '</span>';
+    statHtml += '<span class="encuestas-stat-sub">≤ ' + umbralCritico + ' encuestas</span>';
+    statHtml += '</div>';
+
+    statHtml += '<div class="encuestas-stat stat-bajo">';
+    statHtml += '<span class="encuestas-stat-label">🟠 Bajos</span>';
+    statHtml += '<span class="encuestas-stat-value">' + agentesBajos + '</span>';
+    statHtml += '<span class="encuestas-stat-sub">≤ ' + umbralBajo + ' encuestas</span>';
+    statHtml += '</div>';
+
+    encuestasStatsEl.innerHTML = statHtml;
+
+    var html = '<table class="encuestas-table">';
+    html += '<thead><tr>';
+    html += '<th style="width:50px;text-align:center;">#</th>';
+    html += '<th style="width:240px;">Agente</th>';
+    html += '<th style="width:180px;">Supervisor</th>';
+    html += '<th style="width:100px;text-align:center;">Encuestas</th>';
+    html += '<th style="width:200px;">Volumen relativo</th>';
+    html += '<th style="width:130px;">Estado</th>';
+    html += '</tr></thead><tbody>';
+
+    var filtroAsesorNormLocal = asesorFiltroNorm;
+
+    for (var t2 = 0; t2 < lista.length; t2++) {
+        var a = lista[t2];
+        var pct = maxCount > 0 ? (a.count / maxCount) * 100 : 0;
+
+       var estado, estadoClase, colorBarra;
+        if (a.count <= umbralCritico) {
+            estado = "Crítico"; estadoClase = "critico"; colorBarra = "#DC3545";
+        } else if (a.count <= umbralBajo) {
+            estado = "Bajo"; estadoClase = "bajo"; colorBarra = "#FD7E14";
+        } else if (a.count <= umbralNormal) {
+            estado = "Normal"; estadoClase = "normal"; colorBarra = "#FFC107";
         } else {
-            asesorFiltroActual = nombre;
-            asesorFiltroNorm = normalize(nombre);
+            estado = "Alto"; estadoClase = "alto"; colorBarra = "#28A745";
         }
-        actualizarBannerFiltroAsesor();
-        if (filasEnMemoria.length > 0) agregarYRenderizar();
+
+        var esActiva = (filtroAsesorNormLocal !== "" && normalize(a.nombre) === filtroAsesorNormLocal);
+        html += '<tr data-asesor="' + escapeHtml(a.nombre) + '"' + (esActiva ? ' class="fila-activa"' : '') + '>';
+        html += '<td class="encuestas-rank">' + (t2 + 1) + '</td>';
+        html += '<td class="encuestas-agente">' + escapeHtml(a.nombre) + '</td>';
+        html += '<td class="encuestas-supervisor">' + escapeHtml(a.supervisor) + '</td>';
+        html += '<td class="encuestas-cantidad">' + a.count + '</td>';
+        html += '<td><div class="encuestas-barra-wrap"><div class="encuestas-barra-fill" style="width:' + pct + '%;background:' + colorBarra + ';"></div></div></td>';
+        html += '<td><span class="encuestas-estado ' + estadoClase + '">' + estado + '</span></td>';
+        html += '</tr>';
     }
 
-    function actualizarBannerFiltroAsesor() {
-        if (asesorFiltroActual === "") {
-            filtroAsesorBannerEl.classList.remove("visible");
-            filtroAsesorNombreEl.textContent = "";
-        } else {
-            filtroAsesorBannerEl.classList.add("visible");
-            filtroAsesorNombreEl.textContent = asesorFiltroActual;
-        }
-    }
+    html += '</tbody></table>';
+    encuestasTableContainerEl.innerHTML = html;
 
-    function actualizarSitesPromedios() {
-        var sites = {};
-        for (var i = 0; i < filasFiltradasCache.length; i++) {
-            var f = filasFiltradasCache[i];
-            if (f.site && f.site !== "(Sin Site)") sites[f.site] = true;
-        }
-        var lista = Object.keys(sites).sort();
-        var actual = filtroSitePromediosEl.value;
-        filtroSitePromediosEl.innerHTML = '<option value="">Todos</option>';
-        for (var s = 0; s < lista.length; s++) {
-            var opt = document.createElement("option");
-            opt.value = lista[s];
-            opt.textContent = lista[s];
-            filtroSitePromediosEl.appendChild(opt);
-        }
-        if (actual && lista.indexOf(actual) !== -1) filtroSitePromediosEl.value = actual;
-    }
-
-    function renderPromedios() {
-        var vista = vistaActualPromedios;
-        var siteFiltro = filtroSitePromediosEl.value;
-        var siteFiltroNorm = siteFiltro === "" ? "" : normalize(siteFiltro);
-
-        var conteoTotalPorAgente = {};
-        for (var i = 0; i < filasFiltradasCache.length; i++) {
-            var f = filasFiltradasCache[i];
-            if (!f.operadorNorm) continue;
-            if (!conteoTotalPorAgente[f.operadorNorm]) conteoTotalPorAgente[f.operadorNorm] = 0;
-            conteoTotalPorAgente[f.operadorNorm]++;
-        }
-
-        var conteos = [];
-        for (var kk in conteoTotalPorAgente) conteos.push(conteoTotalPorAgente[kk]);
-        conteos.sort(function(a,b){ return a-b; });
-
-        var mediana = 0;
-        if (conteos.length > 0) {
-            var mid = Math.floor(conteos.length / 2);
-            mediana = (conteos.length % 2 !== 0)
-                ? conteos[mid]
-                : (conteos[mid - 1] + conteos[mid]) / 2;
-        }
-
-        var umbralCritico = Math.max(1, Math.floor(mediana * 0.3));
-        var umbralBajo    = Math.max(2, Math.floor(mediana * 0.6));
-        var umbralNormal  = mediana;
-
-        var estadoPorAgente = {};
-        for (var kk2 in conteoTotalPorAgente) {
-            var cnt = conteoTotalPorAgente[kk2];
-            var est;
-            if (cnt <= umbralCritico) est = "Crítico";
-            else if (cnt <= umbralBajo) est = "Bajo";
-            else if (cnt <= umbralNormal) est = "Normal";
-            else est = "Alto";
-            estadoPorAgente[kk2] = est;
-        }
-
-        var filas = filasFiltradasCache;
-        if (siteFiltroNorm) {
-            var filtradas = [];
-            for (var s = 0; s < filas.length; s++) {
-                if (filas[s].siteNorm === siteFiltroNorm) filtradas.push(filas[s]);
-            }
-            filas = filtradas;
-        }
-
-        var periodos = {};
-        for (var ii = 0; ii < filas.length; ii++) {
-            var fi2 = filas[ii];
-            if (!fi2.fechaYMD || !fi2.operadorNorm) continue;
-            var p = getPeriodoKey(fi2.fechaYMD, vista, fi2.hora);
-            if (!periodos[p.key]) periodos[p.key] = { sortKey: p.sortKey, label: p.label };
-        }
-        var keys = Object.keys(periodos).sort(function(a,b){ return periodos[a].sortKey < periodos[b].sortKey ? -1 : 1; });
-
-        if (keys.length === 0) {
-            promediosInfoEl.textContent = "Sin datos para los filtros seleccionados.";
-            top5MejoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            top5PeoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            return;
-        }
-
-        var ultimoKey = keys[keys.length - 1];
-        var ultimoLabel = periodos[ultimoKey].label;
-        var vistaNombre = vista === "day" ? "día" : (vista === "week" ? "semana" : "mes");
-
-        promediosInfoEl.innerHTML =
-            "📅 tNPS del último " + vistaNombre + ": <strong>" + ultimoLabel + "</strong>" +
-            (siteFiltro ? " · Site: <strong>" + escapeHtml(siteFiltro) + "</strong>" : "");
-
-        var porAgente = {};
-        for (var j = 0; j < filas.length; j++) {
-            var fj = filas[j];
-            if (!fj.fechaYMD || !fj.operadorNorm) continue;
-            var pj = getPeriodoKey(fj.fechaYMD, vista, fj.hora);
-            if (pj.key !== ultimoKey) continue;
-
-            if (!porAgente[fj.operadorNorm]) {
-                porAgente[fj.operadorNorm] = {
-                    nombre: fj.operador,
-                    supervisor: fj.supervisor || "(Sin Supervisor)",
-                    pro: 0, det: 0, count: 0
-                };
-            }
-            var ag = porAgente[fj.operadorNorm];
-            ag.count++;
-            if (fj.notaNum >= 9) ag.pro++;
-            else if (fj.notaNum <= 6) ag.det++;
-        }
-
-        var lista = [];
-        for (var kk3 in porAgente) {
-            var a = porAgente[kk3];
-            if (a.count === 0) continue;
-            var tnps = ((a.pro - a.det) / a.count) * 100;
-            lista.push({
-                nombre: a.nombre,
-                supervisor: a.supervisor,
-                tnps: tnps,
-                count: a.count,
-                estado: estadoPorAgente[kk3] || "Normal"
-            });
-        }
-
-        if (lista.length === 0) {
-            top5MejoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            top5PeoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            return;
-        }
-
-        var listaMejores = lista.filter(function(a){
-            return a.estado === "Normal" || a.estado === "Alto";
+    var filas = encuestasTableContainerEl.querySelectorAll("tr[data-asesor]");
+    for (var f = 0; f < filas.length; f++) {
+        filas[f].addEventListener("click", function() {
+            var nombre = this.getAttribute("data-asesor");
+            toggleFiltroAsesor(nombre);
         });
+    }
+}
 
-        var listaPeores = lista.filter(function(a){
-            return a.estado === "Bajo" || a.estado === "Normal" || a.estado === "Alto";
+function toggleFiltroAsesor(nombre) {
+    if (asesorFiltroActual === nombre) {
+        asesorFiltroActual = "";
+        asesorFiltroNorm = "";
+    } else {
+        asesorFiltroActual = nombre;
+        asesorFiltroNorm = normalize(nombre);
+    }
+    actualizarBannerFiltroAsesor();
+    if (filasEnMemoria.length > 0) agregarYRenderizar();
+}
+
+function actualizarBannerFiltroAsesor() {
+    if (asesorFiltroActual === "") {
+        filtroAsesorBannerEl.classList.remove("visible");
+        filtroAsesorNombreEl.textContent = "";
+    } else {
+        filtroAsesorBannerEl.classList.add("visible");
+        filtroAsesorNombreEl.textContent = asesorFiltroActual;
+    }
+}
+
+function actualizarSitesPromedios() {
+    var sites = {};
+    for (var i = 0; i < filasFiltradasCache.length; i++) {
+        var f = filasFiltradasCache[i];
+        if (f.site && f.site !== "(Sin Site)") sites[f.site] = true;
+    }
+    var lista = Object.keys(sites).sort();
+    var actual = filtroSitePromediosEl.value;
+    filtroSitePromediosEl.innerHTML = '<option value="">Todos</option>';
+    for (var s = 0; s < lista.length; s++) {
+        var opt = document.createElement("option");
+        opt.value = lista[s];
+        opt.textContent = lista[s];
+        filtroSitePromediosEl.appendChild(opt);
+    }
+    if (actual && lista.indexOf(actual) !== -1) filtroSitePromediosEl.value = actual;
+}
+
+function renderPromedios() {
+    var vista = vistaActualPromedios;
+    var siteFiltro = filtroSitePromediosEl.value;
+    var siteFiltroNorm = siteFiltro === "" ? "" : normalize(siteFiltro);
+
+    var conteoTotalPorAgente = {};
+    for (var i = 0; i < filasFiltradasCache.length; i++) {
+        var f = filasFiltradasCache[i];
+        if (!f.operadorNorm) continue;
+        if (!conteoTotalPorAgente[f.operadorNorm]) conteoTotalPorAgente[f.operadorNorm] = 0;
+        conteoTotalPorAgente[f.operadorNorm]++;
+    }
+
+    var conteos = [];
+    for (var kk in conteoTotalPorAgente) conteos.push(conteoTotalPorAgente[kk]);
+    conteos.sort(function(a,b){ return a-b; });
+
+    var mediana = 0;
+    if (conteos.length > 0) {
+        var mid = Math.floor(conteos.length / 2);
+        mediana = (conteos.length % 2 !== 0)
+            ? conteos[mid]
+            : (conteos[mid - 1] + conteos[mid]) / 2;
+    }
+
+    var umbralCritico = Math.max(1, Math.floor(mediana * 0.3));
+    var umbralBajo    = Math.max(2, Math.floor(mediana * 0.6));
+    var umbralNormal  = mediana;
+
+    var estadoPorAgente = {};
+    for (var kk2 in conteoTotalPorAgente) {
+        var cnt = conteoTotalPorAgente[kk2];
+        var est;
+        if (cnt <= umbralCritico) est = "Crítico";
+        else if (cnt <= umbralBajo) est = "Bajo";
+        else if (cnt <= umbralNormal) est = "Normal";
+        else est = "Alto";
+        estadoPorAgente[kk2] = est;
+    }
+
+    var filas = filasFiltradasCache;
+    if (siteFiltroNorm) {
+        var filtradas = [];
+        for (var s = 0; s < filas.length; s++) {
+            if (filas[s].siteNorm === siteFiltroNorm) filtradas.push(filas[s]);
+        }
+        filas = filtradas;
+    }
+
+    var periodos = {};
+    for (var ii = 0; ii < filas.length; ii++) {
+        var fi2 = filas[ii];
+        if (!fi2.fechaYMD || !fi2.operadorNorm) continue;
+        var p = getPeriodoKey(fi2.fechaYMD, vista, fi2.hora);
+        if (!periodos[p.key]) periodos[p.key] = { sortKey: p.sortKey, label: p.label };
+    }
+    var keys = Object.keys(periodos).sort(function(a,b){ return periodos[a].sortKey < periodos[b].sortKey ? -1 : 1; });
+
+    if (keys.length === 0) {
+        promediosInfoEl.textContent = "Sin datos para los filtros seleccionados.";
+        top5MejoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        top5PeoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        return;
+    }
+
+    var ultimoKey = keys[keys.length - 1];
+    var ultimoLabel = periodos[ultimoKey].label;
+    var vistaNombre = vista === "day" ? "día" : (vista === "week" ? "semana" : "mes");
+
+    promediosInfoEl.innerHTML =
+        "📅 tNPS del último " + vistaNombre + ": <strong>" + ultimoLabel + "</strong>" +
+        (siteFiltro ? " · Site: <strong>" + escapeHtml(siteFiltro) + "</strong>" : "");
+
+    var porAgente = {};
+    for (var j = 0; j < filas.length; j++) {
+        var fj = filas[j];
+        if (!fj.fechaYMD || !fj.operadorNorm) continue;
+        var pj = getPeriodoKey(fj.fechaYMD, vista, fj.hora);
+        if (pj.key !== ultimoKey) continue;
+
+        if (!porAgente[fj.operadorNorm]) {
+            porAgente[fj.operadorNorm] = {
+                nombre: fj.operador,
+                supervisor: fj.supervisor || "(Sin Supervisor)",
+                pro: 0, det: 0, count: 0
+            };
+        }
+        var ag = porAgente[fj.operadorNorm];
+        ag.count++;
+        if (fj.notaNum >= 9) ag.pro++;
+        else if (fj.notaNum <= 6) ag.det++;
+    }
+
+    var lista = [];
+    for (var kk3 in porAgente) {
+        var a = porAgente[kk3];
+        if (a.count === 0) continue;
+        var tnps = ((a.pro - a.det) / a.count) * 100;
+        lista.push({
+            nombre: a.nombre,
+            supervisor: a.supervisor,
+            tnps: tnps,
+            count: a.count,
+            estado: estadoPorAgente[kk3] || "Normal"
         });
-
-        var mejores = listaMejores.slice().sort(function(a,b){ return b.tnps - a.tnps; }).slice(0, 5);
-        var peores  = listaPeores.slice().sort(function(a,b){ return a.tnps - b.tnps; }).slice(0, 5);
-
-        renderTablaPromedios(top5MejoresContainerEl, mejores);
-        renderTablaPromedios(top5PeoresContainerEl, peores);
     }
 
-    function renderTablaPromedios(container, lista) {
-        if (!lista || lista.length === 0) {
-            container.innerHTML = '<div class="top5-empty">Sin datos</div>';
-            return;
-        }
-        var html = '<table class="top5-table"><thead><tr>';
-        html += '<th style="width:32px;">#</th>';
-        html += '<th>Agente</th>';
-        html += '<th style="width:86px;">tNPS</th>';
-        html += '<th style="width:80px;text-align:center;">Estado</th>';
-        html += '<th style="width:60px;text-align:center;">Enc.</th>';
-        html += '</tr></thead><tbody>';
-
-        for (var t = 0; t < lista.length; t++) {
-            var a = lista[t];
-            var claseBadge;
-            if (a.tnps >= UMBRAL_TNPS) claseBadge = "promotor";
-            else if (a.tnps >= 40) claseBadge = "pasivo";
-            else claseBadge = "detractor";
-
-            var texto = (a.tnps % 1 === 0) ? a.tnps.toFixed(0) : a.tnps.toFixed(1);
-
-            var estadoClase = "";
-            if (a.estado === "Crítico") estadoClase = "critico";
-            else if (a.estado === "Bajo") estadoClase = "bajo";
-            else if (a.estado === "Normal") estadoClase = "normal";
-            else if (a.estado === "Alto") estadoClase = "alto";
-
-            html += '<tr>';
-            html += '<td class="top5-rank">' + (t + 1) + '</td>';
-            html += '<td class="top5-agente">' + escapeHtml(a.nombre) +
-                    '<div style="font-size:10.5px;color:var(--text-muted);font-weight:600;margin-top:2px;">👤 ' + escapeHtml(a.supervisor) + '</div></td>';
-            html += '<td><span class="nota-badge ' + claseBadge + '">' + texto + '</span></td>';
-            html += '<td style="text-align:center;"><span class="encuestas-estado ' + estadoClase + '">' + a.estado + '</span></td>';
-            html += '<td style="text-align:center;font-weight:700;color:var(--text-muted);">' + a.count + '</td>';
-            html += '</tr>';
-        }
-        html += '</tbody></table>';
-        container.innerHTML = html;
+    if (lista.length === 0) {
+        top5MejoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        top5PeoresContainerEl.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        return;
     }
 
+    var listaMejores = lista.filter(function(a){
+        return a.estado === "Normal" || a.estado === "Alto";
+    });
+
+    var listaPeores = lista.filter(function(a){
+        return a.estado === "Bajo" || a.estado === "Normal" || a.estado === "Alto";
+    });
+
+    var mejores = listaMejores.slice().sort(function(a,b){ return b.tnps - a.tnps; }).slice(0, 5);
+    var peores  = listaPeores.slice().sort(function(a,b){ return a.tnps - b.tnps; }).slice(0, 5);
+
+    renderTablaPromedios(top5MejoresContainerEl, mejores);
+    renderTablaPromedios(top5PeoresContainerEl, peores);
+}
+
+function renderTablaPromedios(container, lista) {
+    if (!lista || lista.length === 0) {
+        container.innerHTML = '<div class="top5-empty">Sin datos</div>';
+        return;
+    }
+    var html = '<table class="top5-table"><thead><tr>';
+    html += '<th style="width:32px;">#</th>';
+    html += '<th>Agente</th>';
+    html += '<th style="width:86px;">tNPS</th>';
+    html += '<th style="width:80px;text-align:center;">Estado</th>';
+    html += '<th style="width:60px;text-align:center;">Enc.</th>';
+    html += '</tr></thead><tbody>';
+
+    for (var t = 0; t < lista.length; t++) {
+        var a = lista[t];
+        var claseBadge;
+        if (a.tnps >= UMBRAL_TNPS) claseBadge = "promotor";
+        else if (a.tnps >= 40) claseBadge = "pasivo";
+        else claseBadge = "detractor";
+
+        var texto = a.tnps.toFixed(2);
+
+        var estadoClase = "";
+        if (a.estado === "Crítico") estadoClase = "critico";
+        else if (a.estado === "Bajo") estadoClase = "bajo";
+        else if (a.estado === "Normal") estadoClase = "normal";
+        else if (a.estado === "Alto") estadoClase = "alto";
+
+        html += '<tr>';
+        html += '<td class="top5-rank">' + (t + 1) + '</td>';
+        html += '<td class="top5-agente">' + escapeHtml(a.nombre) +
+                '<div style="font-size:10.5px;color:var(--text-muted);font-weight:600;margin-top:2px;">👤 ' + escapeHtml(a.supervisor) + '</div></td>';
+        html += '<td><span class="nota-badge ' + claseBadge + '">' + texto + '</span></td>';
+        html += '<td style="text-align:center;"><span class="encuestas-estado ' + estadoClase + '">' + a.estado + '</span></td>';
+        html += '<td style="text-align:center;font-weight:700;color:var(--text-muted);">' + a.count + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
     function abrirModalAsesorCasos(nombreAsesor) {
         modalAsesorModo = "asesor";
         modalAsesorNombreActual = nombreAsesor;
@@ -3659,7 +3736,7 @@ function renderGraficoCategoriasComentarios() {
                                 var al = alertasGlobales[ctx.dataIndex];
                                 if (!al || al.agentes.length === 0) return ["(Sin alertas)"];
                                 var lines = ["──────────────────"];
-                                for (var i = 0; i < Math.min(al.agentes.length, 6); i++) lines.push("• " + al.agentes[i].nombre + " · caída " + al.agentes[i].caida.toFixed(0) + " pts");
+                                for (var i = 0; i < Math.min(al.agentes.length, 6); i++) lines.push("• " + al.agentes[i].nombre + " · caída " + al.agentes[i].caida.toFixed(2) + " pts");
                                 if (al.agentes.length > 6) lines.push("... y " + (al.agentes.length - 6) + " más");
                                 lines.push("(clic para ver detalle)");
                                 return lines;
@@ -3737,7 +3814,7 @@ function renderGraficoCategoriasComentarios() {
                                 var rl = recuperacionesGlobales[ctx.dataIndex];
                                 if (!rl || rl.agentes.length === 0) return ["(Sin recuperaciones)"];
                                 var lines = ["──────────────────"];
-                                for (var i = 0; i < Math.min(rl.agentes.length, 6); i++) lines.push("• " + rl.agentes[i].nombre + " · +" + rl.agentes[i].mejora.toFixed(0) + " pts");
+                                for (var i = 0; i < Math.min(rl.agentes.length, 6); i++) lines.push("• " + rl.agentes[i].nombre + " · +" + rl.agentes[i].mejora.toFixed(2) + " pts");
                                 if (rl.agentes.length > 6) lines.push("... y " + (rl.agentes.length - 6) + " más");
                                 lines.push("(clic para ver detalle)");
                                 return lines;
@@ -3910,16 +3987,16 @@ function renderGraficoCategoriasComentarios() {
             if (tipo === "alertas") {
                 var sev = clasificarSeveridadCaida(a.caida);
                 analisis = '<span class="analisis-badge ' + sev.clase + '">' + sev.texto + '</span>';
-                analisis += '<div class="analisis-line"><strong>tNPS del periodo:</strong> ' + a.tnps.toFixed(1) + '</div>';
-                analisis += '<div class="analisis-line"><strong>Promedio del agente:</strong> ' + a.promedio.toFixed(1) + '</div>';
-                analisis += '<div class="analisis-line"><strong>Caída:</strong> ' + a.caida.toFixed(1) + ' puntos</div>';
+                analisis += '<div class="analisis-line"><strong>tNPS del periodo:</strong> ' + a.tnps.toFixed(2) + '</div>';
+                analisis += '<div class="analisis-line"><strong>Promedio del agente:</strong> ' + a.promedio.toFixed(2) + '</div>';
+                analisis += '<div class="analisis-line"><strong>Caída:</strong> ' + a.caida.toFixed(2) + ' puntos</div>';
                 analisis += '<div class="analisis-line"><strong>Encuestas en el periodo:</strong> ' + a.total + '</div>';
             } else {
                 var sev2 = clasificarSeveridadMejora(a.mejora);
                 analisis = '<span class="analisis-badge ' + sev2.clase + '">' + sev2.texto + '</span>';
-                analisis += '<div class="analisis-line"><strong>tNPS del periodo:</strong> ' + a.tnps.toFixed(1) + '</div>';
-                analisis += '<div class="analisis-line"><strong>Promedio del agente:</strong> ' + a.promedio.toFixed(1) + '</div>';
-                analisis += '<div class="analisis-line"><strong>Mejora:</strong> +' + a.mejora.toFixed(1) + ' puntos</div>';
+                analisis += '<div class="analisis-line"><strong>tNPS del periodo:</strong> ' + a.tnps.toFixed(2) + '</div>';
+                analisis += '<div class="analisis-line"><strong>Promedio del agente:</strong> ' + a.promedio.toFixed(2) + '</div>';
+                analisis += '<div class="analisis-line"><strong>Mejora:</strong> +' + a.mejora.toFixed(2) + ' puntos</div>';
                 analisis += '<div class="analisis-line"><strong>Encuestas en el periodo:</strong> ' + a.total + '</div>';
            }
             html += '<tr><td class="modal-agente">' + escapeHtml(a.nombre) + '</td><td class="modal-supervisor">' + escapeHtml(a.supervisor) + '</td><td class="modal-analisis">' + analisis + '</td></tr>';
@@ -3977,14 +4054,14 @@ function renderGraficoCategoriasComentarios() {
             var valorTxt, difTxt;
             if (tipo === "alertas") {
                 var sev = clasificarSeveridadCaida(ap.caida);
-                valorTxt = '<span class="analisis-badge ' + sev.clase + '">' + sev.texto + '</span><br>' + ap.tnps.toFixed(1);
-                difTxt = '<strong style="color:#DC3545;">-' + ap.caida.toFixed(1) + ' pts</strong>';
+                valorTxt = '<span class="analisis-badge ' + sev.clase + '">' + sev.texto + '</span><br>' + ap.tnps.toFixed(2);
+                difTxt = '<strong style="color:#DC3545;">-' + ap.caida.toFixed(2) + ' pts</strong>';
             } else {
                 var sev2 = clasificarSeveridadMejora(ap.mejora);
-                valorTxt = '<span class="analisis-badge ' + sev2.clase + '">' + sev2.texto + '</span><br>' + ap.tnps.toFixed(1);
-                difTxt = '<strong style="color:#28A745;">+' + ap.mejora.toFixed(1) + ' pts</strong>';
+                valorTxt = '<span class="analisis-badge ' + sev2.clase + '">' + sev2.texto + '</span><br>' + ap.tnps.toFixed(2);
+                difTxt = '<strong style="color:#28A745;">+' + ap.mejora.toFixed(2) + ' pts</strong>';
             }
-            html += '<tr><td class="modal-periodo-row">' + escapeHtml(ap.periodoLabel) + '</td><td class="modal-analisis">' + valorTxt + '</td><td class="modal-analisis">' + ap.promedio.toFixed(1) + '</td><td class="modal-analisis">' + difTxt + '</td><td class="modal-analisis">' + ap.total + '</td></tr>';
+            html += '<tr><td class="modal-periodo-row">' + escapeHtml(ap.periodoLabel) + '</td><td class="modal-analisis">' + valorTxt + '</td><td class="modal-analisis">' + ap.promedio.toFixed(2) + '</td><td class="modal-analisis">' + difTxt + '</td><td class="modal-analisis">' + ap.total + '</td></tr>';
         }
         modalAgenteTableBody.innerHTML = html;
         modalAgenteCounterEl.textContent = apariciones.length + (apariciones.length === 1 ? " período" : " períodos");
@@ -4205,7 +4282,7 @@ function renderGraficoCategoriasComentarios() {
                 var pp3 = ag.peorDia.split("-");
                 if (pp3.length === 3) { diaTxt = pp3[2] + "/" + pp3[1]; diaSub = pp3[0]; }
             }
-            html += '<tr><td class="top5-rank">' + (t + 1) + '</td><td class="top5-agente">' + escapeHtml(ag.nombre) + '</td><td class="top5-nota">' + ag.tnps.toFixed(1) + '</td><td class="top5-supervisor">' + escapeHtml(ag.supervisor || "(Sin Supervisor)") + '</td><td class="top5-dia">' + diaTxt + (diaSub ? '<span class="top5-dia-sub">' + diaSub + '</span>' : '') + '</td></tr>';
+            html += '<tr><td class="top5-rank">' + (t + 1) + '</td><td class="top5-agente">' + escapeHtml(ag.nombre) + '</td><td class="top5-nota">' + ag.tnps.toFixed(2) + '</td><td class="top5-supervisor">' + escapeHtml(ag.supervisor || "(Sin Supervisor)") + '</td><td class="top5-dia">' + diaTxt + (diaSub ? '<span class="top5-dia-sub">' + diaSub + '</span>' : '') + '</td></tr>';
         }
         html += '</tbody></table>';
         top5ContainerEl.innerHTML = html;
@@ -4273,10 +4350,10 @@ function renderGraficoCategoriasComentarios() {
                 },
                 plugins: {
                     legend: { display: false },
-                    datalabels: { anchor: "end", align: "end", offset: 4, color: function(ctx) { return colors[ctx.dataIndex]; }, font: { size: 11, weight: "700", family: "Segoe UI, Arial" }, formatter: function(value) { return value.toFixed(1); } },
+                    datalabels: { anchor: "end", align: "end", offset: 4, color: function(ctx) { return colors[ctx.dataIndex]; }, font: { size: 11, weight: "700", family: "Segoe UI, Arial" }, formatter: function(value) { return value.toFixed(2); } },
                     tooltip: { 
                         callbacks: { 
-                            label: function(ctx) { return "tNPS: " + ctx.parsed.y.toFixed(1); }, 
+                            label: function(ctx) { return "tNPS: " + ctx.parsed.y.toFixed(2); }, 
                             footer: function(items) { return counts[items[0].dataIndex] + " encuestas (Clic para filtrar)"; } 
                         } 
                     }
@@ -4302,7 +4379,7 @@ function renderGraficoCategoriasComentarios() {
                     c.save();
                     c.textAlign = "center"; c.textBaseline = "middle";
                     c.fillStyle = color; c.font = "bold 24px Segoe UI, Arial";
-                    c.fillText(valor.toFixed(1), x, y - 2);
+                    c.fillText(valor.toFixed(2), x, y - 2);
                     c.fillStyle = "#6B6B6B"; c.font = "600 10px Segoe UI, Arial";
                     c.fillText("tNPS", x, y + 20);
                     c.restore();
