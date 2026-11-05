@@ -942,6 +942,21 @@
     font-family: Consolas, Monaco, monospace; font-size: 13px;
     resize: vertical; line-height: 1.5; background: #F8F9FA; color: #1F1F1F;
 }
+
+.gauge-details {
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    line-height: 1.3;
+    text-align: left;
+    display: inline-block;
+}
+.gauge-details div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
     </style>
 </head>
 <body>
@@ -2527,22 +2542,26 @@ if (filtroAsesorNormLocal !== "" && f.operadorNorm !== filtroAsesorNormLocal) co
         gaugesRowEl.appendChild(emptyEl);
     } else {
         var fragment = document.createDocumentFragment();
-        var canvases = [];
-        if (totalGeneral.total > 0) {
-            var tnpsGen = ((totalGeneral.pro - totalGeneral.det) / totalGeneral.total) * 100;
-            var itemGen = crearItemGauge("tNPS General", totalGeneral.total + " encuestas");
-            fragment.appendChild(itemGen.item);
-            canvases.push({ canvas: itemGen.canvas, tnps: tnpsGen });
-        }
-        for (var si = 0; si < sitesList.length; si++) {
-            var siteName = sitesList[si];
-            var dataS = porSite[siteName];
-            if (dataS.total === 0) continue;
-            var tnps = ((dataS.pro - dataS.det) / dataS.total) * 100;
-            var itemSite = crearItemGauge(siteName, dataS.total + " encuestas");
-            fragment.appendChild(itemSite.item);
-            canvases.push({ canvas: itemSite.canvas, tnps: tnps });
-        }
+var canvases = [];
+if (totalGeneral.total > 0) {
+    var tnpsGen = ((totalGeneral.pro - totalGeneral.det) / totalGeneral.total) * 100;
+    var pasGen = totalGeneral.total - totalGeneral.pro - totalGeneral.det;
+    // Se pasan los valores: pro, pas, det
+    var itemGen = crearItemGauge("tNPS General", totalGeneral.total + " encuestas", totalGeneral.pro, pasGen, totalGeneral.det);
+    fragment.appendChild(itemGen.item);
+    canvases.push({ canvas: itemGen.canvas, tnps: tnpsGen });
+}
+for (var si = 0; si < sitesList.length; si++) {
+    var siteName = sitesList[si];
+    var dataS = porSite[siteName];
+    if (dataS.total === 0) continue;
+    var tnps = ((dataS.pro - dataS.det) / dataS.total) * 100;
+    var pasSite = dataS.total - dataS.pro - dataS.det;
+    // Se pasan los valores: pro, pas, det
+    var itemSite = crearItemGauge(siteName, dataS.total + " encuestas", dataS.pro, pasSite, dataS.det);
+    fragment.appendChild(itemSite.item);
+    canvases.push({ canvas: itemSite.canvas, tnps: tnps });
+}
         gaugesRowEl.appendChild(fragment);
         for (var ci = 0; ci < canvases.length; ci++) {
             var cch = canvases[ci];
@@ -2563,7 +2582,7 @@ if (filtroAsesorNormLocal !== "" && f.operadorNorm !== filtroAsesorNormLocal) co
     renderPromedios();
 }
 
-function crearItemGauge(nombre, subtitulo) {
+function crearItemGauge(nombre, subtitulo, pro, pas, det) {
     var item = document.createElement("div");
     item.className = "gauge-item";
     var wrap = document.createElement("div");
@@ -2579,8 +2598,19 @@ function crearItemGauge(nombre, subtitulo) {
     cnt.className = "gauge-count";
     cnt.textContent = subtitulo;
     item.appendChild(cnt);
+
+    // NUEVO: Agregar los detalles de conteo
+    var details = document.createElement("div");
+    details.className = "gauge-details";
+    details.innerHTML = `
+        <div>🔴 ${det} Detractores</div>
+        <div>🟡 ${pas} Pasivos</div>
+        <div>🟢 ${pro} Promotores</div>
+    `;
+    item.appendChild(details);
+
     return { item: item, canvas: canvas };
-}
+} 
 
 function renderGraficoBarSkills() {
     if (chartPieSkillsInstance) {
@@ -4828,6 +4858,7 @@ function renderTablaPromedios(container, lista) {
             setTimeout(function() { copyWAFeedback.classList.remove("visible"); }, 2500);
         });
     });
+
     // --- AQUÍ TERMINA EL CÓDIGO QUE DEBES PEGAR ---
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargarLicencias);
