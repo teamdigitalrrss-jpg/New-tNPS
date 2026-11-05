@@ -923,6 +923,25 @@
             .chart-canvas-wrap.medium { height: 360px; }
             .modal { max-height: 95vh; }
         }
+
+        /* ========== BOTON Y MODAL WHATSAPP ========== */
+.btn-wa {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #25D366; color: #FFFFFF;
+    border: none; padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    font-weight: 700; font-size: 13px; cursor: pointer;
+    transition: background 0.2s ease;
+    box-shadow: 0 2px 6px rgba(37,211,102,0.35);
+    flex-shrink: 0;
+}
+.btn-wa:hover { background: #128C7E; }
+.wa-textarea {
+    width: 100%; height: 400px; padding: 15px;
+    border: 1px solid var(--border); border-radius: var(--radius-md);
+    font-family: Consolas, Monaco, monospace; font-size: 13px;
+    resize: vertical; line-height: 1.5; background: #F8F9FA; color: #1F1F1F;
+}
     </style>
 </head>
 <body>
@@ -945,10 +964,17 @@
             <div class="toolbar">
                 <div class="toolbar-left">
                     <button class="btn-upload" id="btnUpload">
-                        <span class="icon">📂</span>
-                        <span>Cargar Reportes</span>
-                    </button>
-                    <input type="file" id="csvFiles" accept=".csv" multiple>
+    <span class="icon">📂</span>
+    <span>Cargar Reportes</span>
+</button>
+
+<!-- NUEVO BOTÓN DE WHATSAPP -->
+<button class="btn-wa" id="btnGenerarWA">
+    <span class="icon">📲</span>
+    <span>Texto WhatsApp</span>
+</button>
+
+<input type="file" id="csvFiles" accept=".csv" multiple>
 
                     <div class="switch-container" id="switchCompletas" role="switch" aria-checked="false" tabindex="0">
                         <div class="switch"></div>
@@ -1286,7 +1312,7 @@
                             <div id="top5MejoresContainer"><div class="top5-empty">Sin datos</div></div>
                         </div>
                         <div class="promedios-col">
-                            <div class="promedios-col-title peores">📉 Peores tNPS</div>
+                            <div class="promedios-col-title peores">📉 tNPS más bajo</div>
                             <div id="top5PeoresContainer"><div class="top5-empty">Sin datos</div></div>
                         </div>
                     </div>
@@ -1393,7 +1419,33 @@
                 </div>
             </div>
         </div>
+
+        
     </div>
+
+    <!-- NUEVO MODAL DE WHATSAPP -->
+<div class="modal-backdrop" id="modalWABackdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+        <div class="modal-header" style="border-bottom-color: #25D366;">
+            <div class="modal-title" style="color: #25D366;">📲 Reporte para WhatsApp</div>
+            <button class="modal-close" id="modalWAClose" aria-label="Cerrar">&times;</button>
+        </div>
+        <div class="modal-body">
+            <textarea class="wa-textarea" id="waTextArea" readonly></textarea>
+        </div>
+        <div class="modal-footer">
+            <div class="modal-counter"></div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span class="copy-feedback" id="copyWAFeedback">✓ Copiado al portapapeles</span>
+                <button class="btn-copy" id="btnCopiarTextoWA" style="background: #25D366; color: white;">
+                    <span class="icon">📋</span>
+                    <span>Copiar Texto</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
             <script>
 (function () {
     "use strict";
@@ -4529,6 +4581,254 @@ function renderTablaPromedios(container, lista) {
         }
         procesarSiguienteArchivo();
     }
+    // --- AQUÍ EMPIEZA EL CÓDIGO QUE DEBES PEGAR ---
+    var modalWABackdrop = document.getElementById("modalWABackdrop");
+    var modalWAClose = document.getElementById("modalWAClose");
+    var waTextArea = document.getElementById("waTextArea");
+    var btnGenerarWA = document.getElementById("btnGenerarWA");
+    var btnCopiarTextoWA = document.getElementById("btnCopiarTextoWA");
+    var copyWAFeedback = document.getElementById("copyWAFeedback");
+
+    modalWAClose.addEventListener("click", function() {
+        modalWABackdrop.classList.remove("visible");
+        copyWAFeedback.classList.remove("visible");
+    });
+    modalWABackdrop.addEventListener("click", function(e) {
+        if (e.target === modalWABackdrop) {
+            modalWABackdrop.classList.remove("visible");
+            copyWAFeedback.classList.remove("visible");
+        }
+    });
+
+    btnGenerarWA.addEventListener("click", function() {
+    if (filasFiltradasCache.length === 0) {
+        alert("No hay datos cargados para generar el reporte.");
+        return;
+    }
+
+    // 1. Saludo
+    var horaActual = new Date().getHours();
+    var saludo = "Buenos días";
+    if (horaActual >= 12 && horaActual < 19) saludo = "Buenas tardes";
+    else if (horaActual >= 19 || horaActual < 6) saludo = "Buenas noches";
+
+    // 2. Agrupar por hora para encontrar la penúltima hora global
+    var porHora = {};
+    filasFiltradasCache.forEach(function(f) {
+        if (!f.hora) return;
+        var hStr = String(f.hora).trim().split(":")[0].padStart(2, "0");
+        if (!porHora[hStr]) porHora[hStr] = { pro: 0, det: 0, total: 0 };
+        porHora[hStr].total++;
+        if (f.notaNum >= 9) porHora[hStr].pro++;
+        else if (f.notaNum <= 6) porHora[hStr].det++;
+    });
+
+    var horasOrdenadas = Object.keys(porHora).sort();
+    var penultimaHora = "";
+    var tnpsPenultima = 0;
+
+    if (horasOrdenadas.length >= 2) {
+        penultimaHora = horasOrdenadas[horasOrdenadas.length - 2];
+    } else if (horasOrdenadas.length === 1) {
+        penultimaHora = horasOrdenadas[0];
+    }
+
+    if (penultimaHora && porHora[penultimaHora]) {
+        var d = porHora[penultimaHora];
+        tnpsPenultima = d.total > 0 ? ((d.pro - d.det) / d.total) * 100 : 0;
+    }
+
+    // 3. Alertas de la penúltima hora
+    var promedioAgente = calcularPromediosAgentes(filasFiltradasCache);
+    var agentesHora = {};
+    filasFiltradasCache.forEach(function(f) {
+        if (!f.hora) return;
+        var hStr = String(f.hora).trim().split(":")[0].padStart(2, "0");
+        if (hStr !== penultimaHora) return;
+        if (!agentesHora[f.operadorNorm]) agentesHora[f.operadorNorm] = { nombre: f.operador, pro: 0, det: 0, total: 0 };
+        agentesHora[f.operadorNorm].total++;
+        if (f.notaNum >= 9) agentesHora[f.operadorNorm].pro++;
+        else if (f.notaNum <= 6) agentesHora[f.operadorNorm].det++;
+    });
+
+    var alertasHora = [];
+    for (var agK in agentesHora) {
+        if (promedioAgente[agK] === undefined) continue;
+        var ag = agentesHora[agK];
+        if (ag.total === 0) continue;
+        var tnpsP = ((ag.pro - ag.det) / ag.total) * 100;
+        var prom = promedioAgente[agK];
+        var caida = prom - tnpsP;
+        if (caida >= UMBRAL_ALERTA) {
+            alertasHora.push({
+                nombre: ag.nombre,
+                tnps: tnpsP,
+                promedio: prom,
+                caida: caida,
+                total: ag.total
+            });
+        }
+    }
+    alertasHora.sort(function(a, b) { return b.caida - a.caida; });
+
+    // 4. Calcular Datos del Día (Último día disponible en los datos)
+    var vista = "day";
+    var periodos = {};
+    for (var ii = 0; ii < filasFiltradasCache.length; ii++) {
+        var fi2 = filasFiltradasCache[ii];
+        if (!fi2.fechaYMD || !fi2.operadorNorm) continue;
+        var p = getPeriodoKey(fi2.fechaYMD, vista, fi2.hora);
+        if (!periodos[p.key]) periodos[p.key] = { sortKey: p.sortKey, label: p.label };
+    }
+    var keys = Object.keys(periodos).sort(function(a,b){ return periodos[a].sortKey < periodos[b].sortKey ? -1 : 1; });
+    var ultimoKey = keys.length > 0 ? keys[keys.length - 1] : "";
+
+    var conteoTotalPorAgente = {};
+    for (var i = 0; i < filasFiltradasCache.length; i++) {
+        var f = filasFiltradasCache[i];
+        if (!f.operadorNorm) continue;
+        if (!conteoTotalPorAgente[f.operadorNorm]) conteoTotalPorAgente[f.operadorNorm] = 0;
+        conteoTotalPorAgente[f.operadorNorm]++;
+    }
+
+    var conteos = [];
+    for (var kk in conteoTotalPorAgente) conteos.push(conteoTotalPorAgente[kk]);
+    conteos.sort(function(a,b){ return a-b; });
+
+    var mediana = 0;
+    if (conteos.length > 0) {
+        var mid = Math.floor(conteos.length / 2);
+        mediana = (conteos.length % 2 !== 0)
+            ? conteos[mid]
+            : (conteos[mid - 1] + conteos[mid]) / 2;
+    }
+
+    var umbralCritico = Math.max(1, Math.floor(mediana * 0.3));
+    var umbralBajo    = Math.max(2, Math.floor(mediana * 0.6));
+    var umbralNormal  = mediana;
+
+    var estadoPorAgente = {};
+    for (var kk2 in conteoTotalPorAgente) {
+        var cnt = conteoTotalPorAgente[kk2];
+        var est;
+        if (cnt <= umbralCritico) est = "Crítico";
+        else if (cnt <= umbralBajo) est = "Bajo";
+        else if (cnt <= umbralNormal) est = "Normal";
+        else est = "Alto";
+        estadoPorAgente[kk2] = est;
+    }
+
+    var porAgenteDia = {};
+    if (ultimoKey) {
+        for (var j = 0; j < filasFiltradasCache.length; j++) {
+            var fj = filasFiltradasCache[j];
+            if (!fj.fechaYMD || !fj.operadorNorm) continue;
+            var pj = getPeriodoKey(fj.fechaYMD, vista, fj.hora);
+            if (pj.key !== ultimoKey) continue;
+
+            if (!porAgenteDia[fj.operadorNorm]) {
+                porAgenteDia[fj.operadorNorm] = { nombre: fj.operador, supervisor: fj.supervisor || "(Sin Supervisor)", pro: 0, det: 0, count: 0 };
+            }
+            var agD = porAgenteDia[fj.operadorNorm];
+            agD.count++;
+            if (fj.notaNum >= 9) agD.pro++;
+            else if (fj.notaNum <= 6) agD.det++;
+        }
+    }
+
+    var listaPeores = [];
+    for (var k in porAgenteDia) {
+        var a = porAgenteDia[k];
+        if (a.count === 0) continue;
+        var tnps = ((a.pro - a.det) / a.count) * 100;
+        var estado = estadoPorAgente[k] || "Normal";
+        if (estado === "Crítico") continue;
+        listaPeores.push({ nombre: a.nombre, tnps: tnps, supervisor: a.supervisor });
+    }
+    listaPeores.sort(function(a, b) { return a.tnps - b.tnps; });
+    var peoresTop = listaPeores.slice(0, 2);
+
+    var listaMenos = [];
+    for (var k2 in porAgenteDia) {
+        var a2 = porAgenteDia[k2];
+        listaMenos.push({ nombre: a2.nombre, count: a2.count, supervisor: a2.supervisor });
+    }
+    listaMenos.sort(function(a, b) { return a.count - b.count; });
+    var menosTop = listaMenos.slice(0, 2);
+
+    // 5. Armar el texto estructurado y en negrita para WhatsApp
+    var texto = "*" + saludo + "*\n\n";
+    
+    // NUEVO FORMATO PARA EL RESUMEN GENERAL
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "📊 *RESUMEN GENERAL*\n\n";
+    texto += "📈 *Promedio de tNPS:* " + tnpsPenultima.toFixed(2) + "\n";
+    texto += "🕒 *Hora evaluada:* " + penultimaHora + ":00\n\n";
+    
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "🚨 *Contamos con " + alertasHora.length + " alertas de agentes que bajaron su promedio en la hora (" + penultimaHora + ":00):*\n\n";
+    
+    if (alertasHora.length > 0) {
+        alertasHora.slice(0, 1).forEach(function(a) { 
+            var sev = clasificarSeveridadCaida(a.caida).texto;
+            texto += "👤 *Asesor:* " + a.nombre + "\n";
+            texto += "📉 *Alerta:* " + sev + "\n";
+            texto += "📊 *tNPS del periodo:* " + a.tnps.toFixed(2) + "\n";
+            texto += "📈 *Promedio del agente:* " + a.promedio.toFixed(2) + "\n";
+            texto += "⚠️ *Caída:* " + a.caida.toFixed(2) + " puntos\n";
+            texto += "📝 *Encuestas en el periodo:* " + a.total + "\n\n";
+        });
+    } else {
+        texto += "No se registraron alertas en este periodo.\n\n";
+    }
+
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "📉 *Se detalla también los asesores con tNPS más bajo en el día:*\n\n";
+    
+    if (peoresTop.length > 0) {
+        peoresTop.forEach(function(a) {
+            texto += "👤 *Asesor:* " + a.nombre + "\n";
+            texto += "👔 *Supervisor:* " + a.supervisor + "\n";
+            texto += "📊 *TNP:* " + a.tnps.toFixed(2) + "\n\n";
+        });
+    } else {
+        texto += "No hay datos suficientes para calcular los tNPS más bajos.\n\n";
+    }
+
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "📭 *Agentes con menos encuestas enviadas en el día:*\n\n";
+    
+    if (menosTop.length > 0) {
+        menosTop.forEach(function(a) {
+            texto += "👤 *Asesor:* " + a.nombre + "\n";
+            texto += "👔 *Supervisor:* " + a.supervisor + "\n";
+            texto += "📝 *Encuestas:* " + a.count + "\n\n";
+        });
+    } else {
+        texto += "No hay datos suficientes.\n\n";
+    }
+
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "*Quedamos atentos al seguimiento.*";
+
+    waTextArea.value = texto;
+    modalWABackdrop.classList.add("visible");
+});
+
+    btnCopiarTextoWA.addEventListener("click", function() {
+        waTextArea.select();
+        waTextArea.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(waTextArea.value).then(function() {
+            copyWAFeedback.classList.add("visible");
+            setTimeout(function() { copyWAFeedback.classList.remove("visible"); }, 2500);
+        }).catch(function(err) {
+            console.error("Error al copiar texto: ", err);
+            document.execCommand("copy");
+            copyWAFeedback.classList.add("visible");
+            setTimeout(function() { copyWAFeedback.classList.remove("visible"); }, 2500);
+        });
+    });
+    // --- AQUÍ TERMINA EL CÓDIGO QUE DEBES PEGAR ---
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", cargarLicencias);
     else cargarLicencias();
