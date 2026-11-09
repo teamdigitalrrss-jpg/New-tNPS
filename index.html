@@ -4969,7 +4969,7 @@ if (btnGenerarWAReincidentes) {
         }
 
         // Nuevo encabezado
-        var texto = "*Compartimos detalle de asesores que reinciden en notas bajas en estos periodos hasta el momento:*\n\n";
+        var texto = "*Compartimos detalle de asesores que reinciden en notas bajas por hora hasta el momento:*\n\n";
 
         datosReincidentesParaWA.forEach(function(d) {
             // Nueva estructura de la línea
@@ -5029,14 +5029,13 @@ if (btnGenerarWADetractores) {
     }
     chartReincidenciaEmptyEl.style.display = "none";
 
-    // 1. Agrupar datos por periodo (Ahora usa bloques de 1 hora)
+    // 1. Agrupar datos por periodo (Bloques de 1 hora)
     var porPeriodo = {};
     for (var i = 0; i < filas.length; i++) {
         var f = filas[i];
         if (!f.fechaYMD) continue;
         var p;
         if (vistaActualReincidencia === "hour") {
-            // Usamos la función de 1 hora que creamos para detractores
             p = getPeriodoKey1Hour(f.fechaYMD, f.hora); 
         } else {
             p = getPeriodoKey(f.fechaYMD, vistaActualReincidencia, f.hora);
@@ -5060,10 +5059,10 @@ if (btnGenerarWADetractores) {
         return;
     }
 
-    // 2. Encontrar el TOP 3 de CADA periodo y contar reincidencias
+    // 2. Encontrar el TOP 4 de CADA periodo y contar reincidencias
     var conteoBajos = {}; 
     var nombresAgentes = {};
-    var top3PorPeriodo = {}; 
+    var top4PorPeriodo = {}; 
 
     for (var k = 0; k < keys.length; k++) {
         var periodo = porPeriodo[keys[k]];
@@ -5082,14 +5081,14 @@ if (btnGenerarWADetractores) {
             }
         }
         
-        // REGLA: Tomar el Top 3 (los 3 con menor tnps)
+        // REGLA: Tomar el Top 4 (los 4 con menor tnps)
         listaAgentes.sort(function(a, b) { return a.tnps - b.tnps; });
-        var top3 = listaAgentes.slice(0, 3);
+        var top4 = listaAgentes.slice(0, 4);
         
-        top3PorPeriodo[keys[k]] = top3;
+        top4PorPeriodo[keys[k]] = top4;
 
-        for (var j = 0; j < top3.length; j++) {
-            var ag = top3[j];
+        for (var j = 0; j < top4.length; j++) {
+            var ag = top4[j];
             conteoBajos[ag.key] = (conteoBajos[ag.key] || 0) + 1;
         }
     }
@@ -5097,7 +5096,7 @@ if (btnGenerarWADetractores) {
     // 3. Filtrar SOLO los que reinciden 2 o más veces
     var reincidentes = [];
     for (var agKey in conteoBajos) {
-        if (conteoBajos[agKey] >= 2) { // REGLA: Más de 1 reincidencia
+        if (conteoBajos[agKey] >= 2) { 
             reincidentes.push({ key: agKey, count: conteoBajos[agKey], nombre: nombresAgentes[agKey] });
         }
     }
@@ -5106,7 +5105,7 @@ if (btnGenerarWADetractores) {
 
     if (reincidentes.length === 0) {
         chartReincidenciaEmptyEl.style.display = "flex";
-        chartReincidenciaEmptyEl.textContent = "Ningún asesor se repitió en el Top 3 de malas notas";
+        chartReincidenciaEmptyEl.textContent = "Ningún asesor se repitió en el Top 4 de malas notas";
         return;
     }
 
@@ -5131,10 +5130,10 @@ if (btnGenerarWADetractores) {
         var agData = reincidentes[i];
         
         var dataPoints = keys.map(function(k) {
-            var top3 = top3PorPeriodo[k];
-            for (var b = 0; b < top3.length; b++) {
-                if (top3[b].key === agData.key) {
-                    return parseFloat(top3[b].tnps.toFixed(2));
+            var top4 = top4PorPeriodo[k];
+            for (var b = 0; b < top4.length; b++) {
+                if (top4[b].key === agData.key) {
+                    return parseFloat(top4[b].tnps.toFixed(2));
                 }
             }
             return null; 
