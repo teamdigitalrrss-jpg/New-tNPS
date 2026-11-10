@@ -959,6 +959,27 @@
     align-items: center;
     gap: 4px;
 }
+
+/* ========== BOTÓN FLOTANTE ========== */
+.btn-floating {
+    position: fixed !important;
+    bottom: 30px !important;
+    right: 30px !important;
+    z-index: 9999 !important;
+    border-radius: 50px !important;
+    padding: 15px 25px !important;
+    box-shadow: 0 10px 25px rgba(245, 204, 39, 0.5) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease !important;
+}
+.btn-floating:hover {
+    transform: translateY(-5px) scale(1.03) !important;
+    box-shadow: 0 15px 35px rgba(245, 204, 39, 0.7) !important;
+    background: var(--primary-dark) !important;
+}
+.btn-floating .icon {
+    font-size: 20px !important;
+}
+
     </style>
 </head>
 <body>
@@ -980,7 +1001,7 @@
 
             <div class="toolbar">
                 <div class="toolbar-left">
-                    <button class="btn-upload" id="btnUpload">
+                    <button class="btn-upload btn-floating" id="btnUpload">
     <span class="icon">📂</span>
     <span>Cargar Reportes</span>
 </button>
@@ -1381,10 +1402,11 @@
                 <button type="button" data-view="hour" class="active">Horas (1h)</button>
             </div>
         </div>
-        <div class="chart-canvas-wrap reincidencia-tall">
-            <canvas id="chartDetractores"></canvas>
-            <div class="chart-empty" id="chartDetractoresEmpty">Sin datos</div>
-        </div>
+        <!-- Contenedor modificado para hacerlo más alto (650px) -->
+<div class="chart-canvas-wrap" style="height: 650px !important; min-height: 650px !important; position: relative; width: 100%;">
+    <canvas id="chartDetractores"></canvas>
+    <div class="chart-empty" id="chartDetractoresEmpty">Sin datos</div>
+</div>
         
         <!-- BOTÓN DE WHATSAPP PARA DETRACTORES -->
         <div style="margin-top: 15px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 15px;">
@@ -5291,10 +5313,10 @@ function renderGraficoDetractores() {
         return;
     }
 
-    // 2. Encontrar el TOP 5 de CADA periodo (por cantidad de detractores)
+    // 2. Encontrar el TOP 3 de CADA periodo (por cantidad de detractores)
     var conteoApariciones = {}; 
     var nombresAgentes = {};
-    var top5PorPeriodo = {}; 
+    var top3PorPeriodo = {}; 
 
     for (var k = 0; k < keys.length; k++) {
         var periodo = porPeriodo[keys[k]];
@@ -5310,12 +5332,14 @@ function renderGraficoDetractores() {
         
         // Ordenar de mayor a menor cantidad de detractores
         listaAgentes.sort(function(a, b) { return b.detractores - a.detractores; });
-        var top5 = listaAgentes.slice(0, 5);
         
-        top5PorPeriodo[keys[k]] = top5;
+        // CAMBIO: Ahora es Top 3
+        var top3 = listaAgentes.slice(0, 3);
+        
+        top3PorPeriodo[keys[k]] = top3;
 
-        for (var j = 0; j < top5.length; j++) {
-            var ag = top5[j];
+        for (var j = 0; j < top3.length; j++) {
+            var ag = top3[j];
             conteoApariciones[ag.key] = (conteoApariciones[ag.key] || 0) + 1;
         }
     }
@@ -5332,7 +5356,8 @@ function renderGraficoDetractores() {
 
     if (reincidentes.length === 0) {
         chartDetractoresEmptyEl.style.display = "flex";
-        chartDetractoresEmptyEl.textContent = "Ningún asesor se repitió en el Top 5 de detractores";
+        // CAMBIO: Texto de alerta si no hay repetidos en el Top 3
+        chartDetractoresEmptyEl.textContent = "Ningún asesor se repitió en el Top 3 de detractores";
         return;
     }
 
@@ -5357,10 +5382,10 @@ function renderGraficoDetractores() {
         var agData = reincidentes[i];
         
         var dataPoints = keys.map(function(k) {
-            var top5 = top5PorPeriodo[k];
-            for (var b = 0; b < top5.length; b++) {
-                if (top5[b].key === agData.key) {
-                    return top5[b].detractores;
+            var top3 = top3PorPeriodo[k];
+            for (var b = 0; b < top3.length; b++) {
+                if (top3[b].key === agData.key) {
+                    return top3[b].detractores;
                 }
             }
             return null; 
