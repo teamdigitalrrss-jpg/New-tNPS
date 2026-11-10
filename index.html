@@ -2794,6 +2794,7 @@ function renderGraficoBarSkills() {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            layout: { padding: { right: 60 } }, // Espacio a la derecha para que no se corte el texto
             plugins: {
                 legend: { display: false },
                 datalabels: {
@@ -2816,8 +2817,19 @@ function renderGraficoBarSkills() {
                 }
             },
             scales: {
-                x: { beginAtZero: true, grid: { color: '#F0F0F0' }, ticks: { precision: 0 } },
-                y: { grid: { display: false }, ticks: { font: { weight: '600', size: 11 } } }
+                x: { 
+                    beginAtZero: true, 
+                    grace: '10%', // Espacio al final del eje X
+                    grid: { color: '#F0F0F0' }, 
+                    ticks: { precision: 0 } 
+                },
+                y: { 
+                    grid: { display: false }, 
+                    ticks: { 
+                        font: { weight: '600', size: 11 },
+                        autoSkip: false // Fuerza a mostrar todos los nombres
+                    } 
+                }
             }
         }
     });
