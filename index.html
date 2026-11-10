@@ -4981,7 +4981,7 @@ function renderTablaPromedios(container, lista) {
     modalWABackdrop.classList.add("visible");
 });
 
- // --- LÓGICA WHATSAPP REINCIDENTES ---
+// --- LÓGICA WHATSAPP REINCIDENTES ---
 var btnGenerarWAReincidentes = document.getElementById("btnGenerarWAReincidentes");
 if (btnGenerarWAReincidentes) {
     btnGenerarWAReincidentes.addEventListener("click", function() {
@@ -4990,17 +4990,33 @@ if (btnGenerarWAReincidentes) {
             return;
         }
 
-        // Nuevo encabezado
-        var texto = "*Compartimos detalle de asesores que reinciden en notas bajas por hora hasta el momento:*\n\n";
+        // Ordenar por los más recientes
+        datosReincidentesParaWA.sort(function(a, b) {
+            if (a.horas.length === 0) return 1;
+            if (b.horas.length === 0) return -1;
+            return b.horas[b.horas.length - 1] - a.horas[a.horas.length - 1];
+        });
+        var top2 = datosReincidentesParaWA.slice(0, 2);
 
-        datosReincidentesParaWA.forEach(function(d) {
-            // Nueva estructura de la línea
-            texto += d.emoji + " *" + d.nombre + "* cuenta con " + d.count + " alertas, nota actual *" + d.tnpsGlobal.toFixed(2) + "*.\n";
+        var texto = "*Compartimos detalle de asesores que reinciden en notas bajas por hora hasta el momento (Mostramos los dos más recientes):*\n\n";
+
+        top2.forEach(function(d) {
+            // Formatear las horas (Ej: "08 y 18" o "15, 17 y 18")
+            var horasTexto = "";
+            if (d.horas && d.horas.length > 0) {
+                if (d.horas.length === 1) {
+                    horasTexto = " (" + d.horas[0] + ")";
+                } else {
+                    var lastHora = d.horas[d.horas.length - 1];
+                    var otrasHoras = d.horas.slice(0, -1).join(", ");
+                    horasTexto = " (" + otrasHoras + " y " + lastHora + ")";
+                }
+            }
+            texto += d.emoji + " *" + d.nombre + "* cuenta con " + d.count + " alertas" + horasTexto + ", nota actual *" + d.tnpsGlobal.toFixed(2) + "*.\n";
         });
 
         texto += "\n*Quedamos atentos a sus comentarios.*";
 
-        // Reutilizamos el modal que ya tienes creado
         document.getElementById("waTextArea").value = texto;
         document.getElementById("modalWABackdrop").classList.add("visible");
     });
@@ -5015,10 +5031,29 @@ if (btnGenerarWADetractores) {
             return;
         }
 
-        var texto = "*Compartimos detalle de asesores que reinciden con más detractores por hora:*\n\n";
+        // Ordenar por los más recientes
+        datosDetractoresParaWA.sort(function(a, b) {
+            if (a.horas.length === 0) return 1;
+            if (b.horas.length === 0) return -1;
+            return b.horas[b.horas.length - 1] - a.horas[a.horas.length - 1];
+        });
+        var top2 = datosDetractoresParaWA.slice(0, 2);
 
-        datosDetractoresParaWA.forEach(function(d) {
-            texto += d.emoji + " *" + d.nombre + "* cuenta con " + d.count + " alertas, Total de detractores *" + d.totalDetractores + "*.\n";
+        var texto = "*Compartimos detalle de asesores que reinciden con más detractores por hora (Mostramos los dos más recientes):*\n\n";
+
+        top2.forEach(function(d) {
+            // Formatear las horas
+            var horasTexto = "";
+            if (d.horas && d.horas.length > 0) {
+                if (d.horas.length === 1) {
+                    horasTexto = " (" + d.horas[0] + ")";
+                } else {
+                    var lastHora = d.horas[d.horas.length - 1];
+                    var otrasHoras = d.horas.slice(0, -1).join(", ");
+                    horasTexto = " (" + otrasHoras + " y " + lastHora + ")";
+                }
+            }
+            texto += d.emoji + " *" + d.nombre + "* cuenta con " + d.count + " alertas" + horasTexto + ", Total de detractores *" + d.totalDetractores + "*.\n";
         });
 
         texto += "\n*Quedamos atentos a sus comentarios.*";
@@ -5237,35 +5272,46 @@ if (btnGenerarWADetractores) {
         }
     });
 
-    // GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
-    datosReincidentesParaWA = [];
-    var emojisColores = {
-        "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠",
-        "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣"
-    };
+// GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
+datosReincidentesParaWA = [];
+var emojisColores = { "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠", "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣" };
 
-    for (var r = 0; r < reincidentes.length; r++) {
-        var ag = reincidentes[r];
-        var colorHex = coloresAsignados[ag.key];
-        var emojiColor = emojisColores[colorHex] || "⚪";
+for (var r = 0; r < reincidentes.length; r++) {
+    var ag = reincidentes[r];
+    var emojiColor = emojisColores[coloresAsignados[ag.key]] || "⚪";
 
-        var proG = 0, detG = 0, totalG = 0;
-        for (var f = 0; f < filasFiltradasCache.length; f++) {
-            if (filasFiltradasCache[f].operadorNorm === ag.key) {
-                totalG++;
-                if (filasFiltradasCache[f].notaNum >= 9) proG++;
-                else if (filasFiltradasCache[f].notaNum <= 6) detG++;
+    // 1. Obtener las horas en las que apareció
+    var horasAparicion = [];
+    for(var k = 0; k < keys.length; k++) {
+        var top4 = top4PorPeriodo[keys[k]];
+        for(var b=0; b<top4.length; b++) {
+            if(top4[b].key === ag.key) {
+                // Tomamos solo la hora (ej. de "08:00" sacamos "08")
+                var horaStr = porPeriodo[keys[k]].label.split(':')[0];
+                horasAparicion.push(horaStr);
+                break;
             }
         }
-        var tnpsGlobal = totalG > 0 ? ((proG - detG) / totalG) * 100 : 0;
-
-        datosReincidentesParaWA.push({
-            nombre: ag.nombre.split('@')[0],
-            count: ag.count,
-            emoji: emojiColor,
-            tnpsGlobal: tnpsGlobal
-        });
     }
+
+    var proG = 0, detG = 0, totalG = 0;
+    for (var f = 0; f < filasFiltradasCache.length; f++) {
+        if (filasFiltradasCache[f].operadorNorm === ag.key) {
+            totalG++;
+            if (filasFiltradasCache[f].notaNum >= 9) proG++;
+            else if (filasFiltradasCache[f].notaNum <= 6) detG++;
+        }
+    }
+    var tnpsGlobal = totalG > 0 ? ((proG - detG) / totalG) * 100 : 0;
+
+    datosReincidentesParaWA.push({
+        nombre: ag.nombre.split('@')[0],
+        count: ag.count,
+        emoji: emojiColor,
+        tnpsGlobal: tnpsGlobal,
+        horas: horasAparicion // <--- NUEVO DATO
+    });
+}
 }
 
 // Función para agrupar por bloques exactos de 1 hora (incluyendo fecha para no mezclar días)
@@ -5458,33 +5504,42 @@ function renderGraficoDetractores() {
         }
     });
 
-    // GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
-    datosDetractoresParaWA = [];
-    var emojisColores = {
-        "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠",
-        "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣"
-    };
+// GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
+datosDetractoresParaWA = [];
+var emojisColores = { "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠", "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣" };
 
-    for (var r = 0; r < reincidentes.length; r++) {
-        var ag = reincidentes[r];
-        var colorHex = coloresAsignados[ag.key];
-        var emojiColor = emojisColores[colorHex] || "⚪";
+for (var r = 0; r < reincidentes.length; r++) {
+    var ag = reincidentes[r];
+    var emojiColor = emojisColores[coloresAsignados[ag.key]] || "⚪";
 
-        // Calcular Total de detractores de este asesor en todo el periodo
-        var totalDetractoresGlobal = 0;
-        for (var f = 0; f < filasFiltradasCache.length; f++) {
-            if (filasFiltradasCache[f].operadorNorm === ag.key && filasFiltradasCache[f].notaNum <= 6) {
-                totalDetractoresGlobal++;
+    // 1. Obtener las horas en las que apareció
+    var horasAparicion = [];
+    for(var k = 0; k < keys.length; k++) {
+        var top3 = top3PorPeriodo[keys[k]];
+        for(var b=0; b<top3.length; b++) {
+            if(top3[b].key === ag.key) {
+                var horaStr = porPeriodo[keys[k]].label.split(':')[0];
+                horasAparicion.push(horaStr);
+                break;
             }
         }
-
-        datosDetractoresParaWA.push({
-            nombre: ag.nombre.split('@')[0],
-            count: ag.count,
-            emoji: emojiColor,
-            totalDetractores: totalDetractoresGlobal
-        });
     }
+
+    var totalDetractoresGlobal = 0;
+    for (var f = 0; f < filasFiltradasCache.length; f++) {
+        if (filasFiltradasCache[f].operadorNorm === ag.key && filasFiltradasCache[f].notaNum <= 6) {
+            totalDetractoresGlobal++;
+        }
+    }
+
+    datosDetractoresParaWA.push({
+        nombre: ag.nombre.split('@')[0],
+        count: ag.count,
+        emoji: emojiColor,
+        totalDetractores: totalDetractoresGlobal,
+        horas: horasAparicion // <--- NUEVO DATO
+    });
+}
 }
 
 
