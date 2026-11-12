@@ -5340,10 +5340,10 @@ function renderGraficoDetractores() {
         return;
     }
 
-    // 2. Encontrar el TOP 3 de CADA periodo (por cantidad de detractores)
+    // 2. Encontrar el TOP 5 de CADA periodo (por cantidad de detractores)
     var conteoApariciones = {}; 
     var nombresAgentes = {};
-    var top3PorPeriodo = {}; 
+    var top5PorPeriodo = {}; 
 
     for (var k = 0; k < keys.length; k++) {
         var periodo = porPeriodo[keys[k]];
@@ -5357,16 +5357,14 @@ function renderGraficoDetractores() {
             listaAgentes.push({ key: agK, nombre: agData.nombre, detractores: agData.detractores });
         }
         
-        // Ordenar de mayor a menor cantidad de detractores
+        // Ordenar de mayor a menor cantidad de detractores y tomar los primeros 5
         listaAgentes.sort(function(a, b) { return b.detractores - a.detractores; });
+        var top5 = listaAgentes.slice(0, 5);
         
-        // CAMBIO: Ahora es Top 3
-        var top3 = listaAgentes.slice(0, 3);
-        
-        top3PorPeriodo[keys[k]] = top3;
+        top5PorPeriodo[keys[k]] = top5;
 
-        for (var j = 0; j < top3.length; j++) {
-            var ag = top3[j];
+        for (var j = 0; j < top5.length; j++) {
+            var ag = top5[j];
             conteoApariciones[ag.key] = (conteoApariciones[ag.key] || 0) + 1;
         }
     }
@@ -5383,8 +5381,8 @@ function renderGraficoDetractores() {
 
     if (reincidentes.length === 0) {
         chartDetractoresEmptyEl.style.display = "flex";
-        // CAMBIO: Texto de alerta si no hay repetidos en el Top 3
-        chartDetractoresEmptyEl.textContent = "Ningún asesor se repitió en el Top 3 de detractores";
+        // CAMBIO: Texto de alerta si no hay repetidos en el Top 5
+        chartDetractoresEmptyEl.textContent = "Ningún asesor se repitió en el Top 5 de detractores";
         return;
     }
 
@@ -5409,10 +5407,10 @@ function renderGraficoDetractores() {
         var agData = reincidentes[i];
         
         var dataPoints = keys.map(function(k) {
-            var top3 = top3PorPeriodo[k];
-            for (var b = 0; b < top3.length; b++) {
-                if (top3[b].key === agData.key) {
-                    return top3[b].detractores;
+            var top5 = top5PorPeriodo[k];
+            for (var b = 0; b < top5.length; b++) {
+                if (top5[b].key === agData.key) {
+                    return top5[b].detractores;
                 }
             }
             return null; 
@@ -5485,42 +5483,47 @@ function renderGraficoDetractores() {
         }
     });
 
-// GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
-datosDetractoresParaWA = [];
-var emojisColores = { "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠", "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣" };
+    // GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP
+    datosDetractoresParaWA = [];
+    var emojisColores = {
+        "#8B0000": "🔴", "#DC3545": "🔴", "#FF7F50": "🟠", "#FD7E14": "🟠",
+        "#FFC107": "🟡", "#198754": "🟢", "#0D6EFD": "🔵", "#6F42C1": "🟣", "#D63384": "🟣"
+    };
 
-for (var r = 0; r < reincidentes.length; r++) {
-    var ag = reincidentes[r];
-    var emojiColor = emojisColores[coloresAsignados[ag.key]] || "⚪";
+    for (var r = 0; r < reincidentes.length; r++) {
+        var ag = reincidentes[r];
+        var colorHex = coloresAsignados[ag.key];
+        var emojiColor = emojisColores[colorHex] || "⚪";
 
-    // 1. Obtener las horas en las que apareció
-    var horasAparicion = [];
-    for(var k = 0; k < keys.length; k++) {
-        var top3 = top3PorPeriodo[keys[k]];
-        for(var b=0; b<top3.length; b++) {
-            if(top3[b].key === ag.key) {
-                var horaStr = porPeriodo[keys[k]].label.split(':')[0];
-                horasAparicion.push(horaStr);
-                break;
+        // Obtener las horas en las que apareció (Para el mensaje de WhatsApp)
+        var horasAparicion = [];
+        for(var k = 0; k < keys.length; k++) {
+            var top5 = top5PorPeriodo[keys[k]];
+            for(var b=0; b<top5.length; b++) {
+                if(top5[b].key === ag.key) {
+                    var horaStr = porPeriodo[keys[k]].label.split(':')[0];
+                    horasAparicion.push(horaStr);
+                    break;
+                }
             }
         }
-    }
 
-    var totalDetractoresGlobal = 0;
-    for (var f = 0; f < filasFiltradasCache.length; f++) {
-        if (filasFiltradasCache[f].operadorNorm === ag.key && filasFiltradasCache[f].notaNum <= 6) {
-            totalDetractoresGlobal++;
+        // Calcular Total de detractores de este asesor en todo el periodo
+        var totalDetractoresGlobal = 0;
+        for (var f = 0; f < filasFiltradasCache.length; f++) {
+            if (filasFiltradasCache[f].operadorNorm === ag.key && filasFiltradasCache[f].notaNum <= 6) {
+                totalDetractoresGlobal++;
+            }
         }
-    }
 
-    datosDetractoresParaWA.push({
-        nombre: ag.nombre.split('@')[0],
-        count: ag.count,
-        emoji: emojiColor,
-        totalDetractores: totalDetractoresGlobal,
-        horas: horasAparicion // <--- NUEVO DATO
-    });
-}
+        datosDetractoresParaWA.push({
+            nombre: ag.nombre.split('@')[0],
+            count: ag.count,
+            emoji: emojiColor,
+            totalDetractores: totalDetractoresGlobal,
+            horas: horasAparicion
+        });
+    }
 }
 
 
