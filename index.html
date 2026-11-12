@@ -4924,7 +4924,7 @@ function renderTablaPromedios(container, lista) {
         listaPeores.push({ nombre: a.nombre, tnps: tnps, supervisor: a.supervisor });
     }
     listaPeores.sort(function(a, b) { return a.tnps - b.tnps; });
-    var peoresTop = listaPeores.slice(0, 2);
+    var peoresTop = listaPeores.slice(0, 5);
 
     var listaMenos = [];
     for (var k2 in porAgenteDia) {
@@ -4934,7 +4934,7 @@ function renderTablaPromedios(container, lista) {
     listaMenos.sort(function(a, b) { return a.count - b.count; });
     var menosTop = listaMenos.slice(0, 2);
 
-        // 5. Armar el texto final (Versión simplificada)
+            // 5. Armar el texto final
     var texto = "*" + saludo + "*\n\n";
     
     texto += "━━━━━━━━━━━━━━━━━━━━\n";
@@ -4942,6 +4942,21 @@ function renderTablaPromedios(container, lista) {
     texto += "📈 *Promedio de tNPS:* " + tnpsPenultima.toFixed(2) + "\n";
     texto += "🕒 *Hora evaluada:* " + penultimaHora + ":00\n\n";
     
+    // --- NUEVA SECCIÓN: TOP 5 tNPS MÁS BAJO ---
+    texto += "━━━━━━━━━━━━━━━━━━━━\n";
+    texto += "📉 *Top 5 agentes con tNPS más bajo del día:*\n\n";
+    
+    if (peoresTop.length > 0) {
+        peoresTop.forEach(function(a) {
+            texto += "👤 *Asesor:* " + a.nombre + "\n";
+            texto += "👔 *Supervisor:* " + a.supervisor + "\n";
+            texto += "📊 *TNP:* " + a.tnps.toFixed(2) + "\n\n";
+        });
+    } else {
+        texto += "No hay datos suficientes para calcular los tNPS más bajos.\n\n";
+    }
+    // ------------------------------------------
+
     texto += "━━━━━━━━━━━━━━━━━━━━\n";
     texto += "📭 *Agentes con menos encuestas enviadas en el día:*\n\n";
     
