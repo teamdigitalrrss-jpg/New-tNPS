@@ -1097,6 +1097,35 @@
                 </div>
             </div>
 
+            <!-- NUEVO GRÁFICO DE EVOLUCIÓN POR SITE -->
+<div class="charts-row-1" style="margin-top:18px;">
+    <div class="chart-card">
+        <div class="chart-card-header">
+            <div class="chart-title">
+                📈 Evolución tNPS por Site
+                <span class="chart-sub">— cómo varía el indicador hora a hora</span>
+            </div>
+            <div class="view-switch" id="viewSwitchLinealSites">
+                <button type="button" data-view="day">Día</button>
+                <button type="button" data-view="hour" class="active">Horas</button>
+            </div>
+        </div>
+        <!-- Cambia 'medium' por 'big' aquí -->
+<div class="chart-canvas-wrap big">
+    <canvas id="chartLinealSites"></canvas>
+    <div class="chart-empty" id="chartLinealSitesEmpty">Sin datos</div>
+</div>
+
+<!-- NUEVO BOTÓN DE WHATSAPP PARA EVOLUCIÓN POR SITE -->
+<div style="margin-top: 15px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 15px;">
+    <button class="btn-wa" id="btnGenerarWASites" style="background: #25D366; box-shadow: none;">
+        <span class="icon">📲</span>
+        <span>Evolución por Site</span>
+    </button>
+</div>
+    </div>
+</div>
+
             <div class="charts-row-1" style="margin-top:18px;">
                 <div class="chart-card">
                     <div class="chart-card-header">
@@ -2103,6 +2132,12 @@ var copyAsesorFeedbackEl  = document.getElementById("copyAsesorFeedback");
 
 var gaugesInstances = [];
 var chartDiarioInstance = null;
+var chartLinealSitesCanvas = document.getElementById("chartLinealSites");
+var chartLinealSitesEmptyEl = document.getElementById("chartLinealSitesEmpty");
+var viewSwitchLinealSitesEl = document.getElementById("viewSwitchLinealSites");
+var vistaActualLinealSites = "hour";
+var chartLinealSitesInstance = null;
+var datosEvolucionSitesParaWA = {};
 var chartAlertasInstance = null;
 var chartRecuperacionInstance = null;
 var chartTopAsesoresInstance = null;
@@ -2382,6 +2417,18 @@ viewSwitchEl.addEventListener("click", function(e){
     vistaActual = nuevaVista;
     clearFiltroPeriodo(false); 
     renderGraficoBarras();
+});
+
+viewSwitchLinealSitesEl.addEventListener("click", function(e){
+    var btn = e.target.closest("button[data-view]");
+    if (!btn) return;
+    var nuevaVista = btn.getAttribute("data-view");
+    if (nuevaVista === vistaActualLinealSites) return;
+    var botones = viewSwitchLinealSitesEl.querySelectorAll("button");
+    for (var i = 0; i < botones.length; i++) botones[i].classList.remove("active");
+    btn.classList.add("active");
+    vistaActualLinealSites = nuevaVista;
+    renderGraficoLinealSites();
 });
 
 viewSwitchAlertasEl.addEventListener("click", function(e){
@@ -2696,6 +2743,7 @@ for (var si = 0; si < sitesList.length; si++) {
     }
 
     renderGraficoBarras();
+    renderGraficoLinealSites(); // <--- AGREGA ESTA LÍNEA
     renderGraficoBarSkills();
     renderGraficoAlertas();
     renderGraficoRecuperacion();
@@ -4593,6 +4641,306 @@ function renderTablaPromedios(container, lista) {
         });
     }
 
+    function renderGraficoLinealSites() {
+    if (chartLinealSitesInstance) { try { chartLinealSitesInstance.destroy(); } catch(e){} chartLinealSitesInstance = null; }
+    var filas = filasFiltradasCache;
+    if (filas.length === 0) { chartLinealSitesEmptyEl.style.display = "flex"; return; }
+    chartLinealSitesEmptyEl.style.display = "none";
+
+    // 1. Agrupar datos por periodo
+    var datosPorPeriodo = {};
+    for (var i = 0; i < filas.length; i++) {
+        var f = filas[i];
+        if (!f.fechaYMD) continue;
+        
+        var p;
+        if (vistaActualLinealSites === "hour") {
+            p = getPeriodoKey1Hour(f.fechaYMD, f.hora);
+        } else {
+            p = getPeriodoKey(f.fechaYMD, vistaActualLinealSites, f.hora);
+        }
+
+        if (!datosPorPeriodo[p.key]) {
+            datosPorPeriodo[p.key] = { 
+                label: p.label, 
+                sortKey: p.sortKey,
+                santaAna: { pro: 0, det: 0, total: 0 },
+                santaElena: { pro: 0, det: 0, total: 0 }
+            };
+        }
+        
+        var d = datosPorPeriodo[p.key];
+        var esPro = f.notaNum >= 9;
+        var esDet = f.notaNum <= 6;
+
+        var siteUpper = String(f.site).toUpperCase();
+        
+        if (siteUpper.indexOf("SANTA ANA") !== -1) {
+            d.santaAna.total++;
+            if (esPro) d.santaAna.pro++;
+            else if (esDet) d.santaAna.det++;
+        } else if (siteUpper.indexOf("SANTA ELENA") !== -1) {
+            d.santaElena.total++;
+            if (esPro) d.santaElena.pro++;
+            else if (esDet) d.santaElena.det++;
+        }
+    }
+
+    var keys = Object.keys(datosPorPeriodo).sort(function(a, b){ return datosPorPeriodo[a].sortKey < datosPorPeriodo[b].sortKey ? -1 : 1; });
+    if (keys.length === 0) { chartLinealSitesEmptyEl.style.display = "flex"; return; }
+
+    // 2. OMITIR LA ÚLTIMA HORA
+    if (keys.length > 1) {
+        keys.pop();
+    }
+
+    // 3. Armar los datos
+    var labels = keys.map(function(k) { return datosPorPeriodo[k].label; });
+    
+    var dataSantaAna = [];
+    var dataSantaElena = [];
+
+    for (var i = 0; i < keys.length; i++) {
+        var d = datosPorPeriodo[keys[i]];
+
+        if (d.santaAna.total > 0) dataSantaAna.push(parseFloat((((d.santaAna.pro - d.santaAna.det) / d.santaAna.total) * 100).toFixed(2)));
+        else dataSantaAna.push(null);
+
+        if (d.santaElena.total > 0) dataSantaElena.push(parseFloat((((d.santaElena.pro - d.santaElena.det) / d.santaElena.total) * 100).toFixed(2)));
+        else dataSantaElena.push(null);
+    }
+
+    // --- LÓGICA DE PUNTOS Y ETIQUETAS ---
+    
+    // 1. Colores base para TODOS los puntos
+    var bgColorsSA = [];
+    var bgColorsSE = [];
+
+    for(var i = 0; i < dataSantaAna.length; i++) {
+        if (dataSantaAna[i] !== null) {
+            bgColorsSA.push(dataSantaAna[i] >= 75 ? "#28A745" : "#DC3545"); // Verde si es >= 75, Rojo si es < 75
+        } else {
+            bgColorsSA.push("#0D6EFD"); // Color por defecto si no hay dato
+        }
+    }
+
+    for(var i = 0; i < dataSantaElena.length; i++) {
+        if (dataSantaElena[i] !== null) {
+            bgColorsSE.push(dataSantaElena[i] >= 75 ? "#28A745" : "#DC3545");
+        } else {
+            bgColorsSE.push("#28A745");
+        }
+    }
+
+    // 2. Encontrar los 2 puntos más bajos de cada serie (para las etiquetas)
+    var lowestSA = [];
+    var lowestSE = [];
+    
+    for (var i = 0; i < dataSantaAna.length; i++) {
+        if (dataSantaAna[i] !== null) {
+            lowestSA.push({ index: i, value: dataSantaAna[i] });
+        }
+    }
+    lowestSA.sort(function(a, b) { return a.value - b.value; });
+    lowestSA = lowestSA.slice(0, 2); // Tomar los 2 más bajos
+
+    for (var i = 0; i < dataSantaElena.length; i++) {
+        if (dataSantaElena[i] !== null) {
+            lowestSE.push({ index: i, value: dataSantaElena[i] });
+        }
+    }
+    lowestSE.sort(function(a, b) { return a.value - b.value; });
+    lowestSE = lowestSE.slice(0, 2); // Tomar los 2 más bajos
+
+    var labelFlagsSA = Array(dataSantaAna.length).fill(false);
+    var labelFlagsSE = Array(dataSantaElena.length).fill(false);
+
+    lowestSA.forEach(function(item) { labelFlagsSA[item.index] = true; });
+    lowestSE.forEach(function(item) { labelFlagsSE[item.index] = true; });
+
+    // 4. Crear el gráfico
+    chartLinealSitesInstance = new Chart(chartLinealSitesCanvas, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Santa Ana",
+                    data: dataSantaAna,
+                    borderColor: "#0D6EFD", // Línea siempre Azul
+                    backgroundColor: "#0D6EFD",
+                    borderWidth: 2,
+                    tension: 0.3,
+                    spanGaps: true,
+                    pointBackgroundColor: bgColorsSA, // Puntos dinámicos (Verde/Rojo)
+                    pointBorderColor: "#FFFFFF",
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                },
+                {
+                    label: "Santa Elena",
+                    data: dataSantaElena,
+                    borderColor: "#28A745", // Línea siempre Verde
+                    backgroundColor: "#28A745",
+                    borderWidth: 2,
+                    tension: 0.3,
+                    spanGaps: true,
+                    pointBackgroundColor: bgColorsSE, // Puntos dinámicos (Verde/Rojo)
+                    pointBorderColor: "#FFFFFF",
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 35, bottom: 25, right: 20 } },
+            plugins: {
+                legend: { 
+                    position: 'top', 
+                    labels: { 
+                        font: { size: 12, weight: "600" }, 
+                        usePointStyle: true, 
+                        pointStyle: 'line',
+                        generateLabels: function(chart) {
+                            // Forzar a la leyenda a usar el color de la LÍNEA
+                            const labels = Chart.defaults.plugins.legend.labels.generateLabels(chart);
+                            labels.forEach(label => {
+                                label.fillStyle = chart.data.datasets[label.datasetIndex].borderColor;
+                                label.strokeStyle = chart.data.datasets[label.datasetIndex].borderColor;
+                            });
+                            return labels;
+                        }
+                    } 
+                },
+                datalabels: { 
+                    display: function(ctx) {
+                        // Mostrar solo en los 2 puntos más bajos de cada serie
+                        if (ctx.datasetIndex === 0 && labelFlagsSA[ctx.dataIndex]) return true;
+                        if (ctx.datasetIndex === 1 && labelFlagsSE[ctx.dataIndex]) return true;
+                        return false;
+                    },
+                    align: function(ctx) {
+                        // Santa Ana arriba, Santa Elena abajo
+                        return ctx.datasetIndex === 0 ? 'top' : 'bottom';
+                    },
+                    anchor: 'center',
+                    offset: 10,
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    color: function(ctx) {
+                        // El texto es azul para Santa Ana, verde para Santa Elena
+                        return ctx.datasetIndex === 0 ? '#0D6EFD' : '#28A745';
+                    },
+                    borderColor: function(ctx) { 
+                        return ctx.datasetIndex === 0 ? '#0D6EFD' : '#28A745'; 
+                    },
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    padding: { top: 3, bottom: 3, left: 5, right: 5 },
+                    font: { size: 11, weight: "bold" },
+                    formatter: function(value) {
+                        return value.toFixed(2);
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            if (ctx.parsed.y === null) return "";
+                            return ctx.dataset.label + ": " + ctx.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: { 
+                    suggestedMin: -100, 
+                    suggestedMax: 100, 
+                    grid: { color: "#F0F0F0" }, 
+                    ticks: { font: { size: 10 } },
+                    title: { display: true, text: 'tNPS', font: { size: 10, weight: "bold" } }
+                },
+                x: { 
+                    grid: { display: false }, 
+                    ticks: { font: { size: 10, weight: "600" } } 
+                }
+            }
+        }
+    });
+
+    // --- GUARDAR DATOS PARA EL BOTÓN DE WHATSAPP ---
+var totalEncuestasSA = 0;
+var totalEncuestasSE = 0;
+var horasEnMetaSA = 0;
+var horasFueraMetaSA = 0;
+var notasBajasSA = [];
+
+var horasEnMetaSE = 0;
+var horasFueraMetaSE = 0;
+var notasBajasSE = [];
+
+// Recorremos los datos agrupados para sumar encuestas y contar horas
+for (var i = 0; i < keys.length; i++) {
+    var d = datosPorPeriodo[keys[i]];
+    totalEncuestasSA += d.santaAna.total;
+    totalEncuestasSE += d.santaElena.total;
+}
+
+// Evaluamos las horas de Santa Ana
+for (var i = 0; i < dataSantaAna.length; i++) {
+    var valor = dataSantaAna[i];
+    if (valor !== null) {
+        if (valor >= 75) {
+            horasEnMetaSA++;
+        } else {
+            horasFueraMetaSA++;
+            // Extraemos solo la hora del label (ej. "12:00" -> "12")
+            var horaStr = labels[i] ? labels[i].split(':')[0] : "00";
+            notasBajasSA.push({ valor: valor, hora: horaStr });
+        }
+    }
+}
+
+// Evaluamos las horas de Santa Elena
+for (var i = 0; i < dataSantaElena.length; i++) {
+    var valor = dataSantaElena[i];
+    if (valor !== null) {
+        if (valor >= 75) {
+            horasEnMetaSE++;
+        } else {
+            horasFueraMetaSE++;
+            var horaStr = labels[i] ? labels[i].split(':')[0] : "00";
+            notasBajasSE.push({ valor: valor, hora: horaStr });
+        }
+    }
+}
+
+// Ordenamos las notas bajas de menor a mayor y tomamos solo 2
+notasBajasSA.sort(function(a, b) { return a.valor - b.valor; });
+notasBajasSA = notasBajasSA.slice(0, 2);
+
+notasBajasSE.sort(function(a, b) { return a.valor - b.valor; });
+notasBajasSE = notasBajasSE.slice(0, 2);
+
+// Guardamos todo en la variable global
+datosEvolucionSitesParaWA = {
+    santaAna: {
+        totalEncuestas: totalEncuestasSA,
+        enMeta: horasEnMetaSA,
+        fueraMeta: horasFueraMetaSA,
+        peoresNotas: notasBajasSA
+    },
+    santaElena: {
+        totalEncuestas: totalEncuestasSE,
+        enMeta: horasEnMetaSE,
+        fueraMeta: horasFueraMetaSE,
+        peoresNotas: notasBajasSE
+    }
+};
+}
+
     function crearGauge(canvasEl, valor, color) {
         var v = Math.max(0, Math.min(100, valor));
         return new Chart(canvasEl, {
@@ -4766,6 +5114,65 @@ function renderTablaPromedios(container, lista) {
     var btnGenerarWA = document.getElementById("btnGenerarWA");
     var btnCopiarTextoWA = document.getElementById("btnCopiarTextoWA");
     var copyWAFeedback = document.getElementById("copyWAFeedback");
+// --- LÓGICA WHATSAPP EVOLUCIÓN POR SITE ---
+var btnGenerarWASites = document.getElementById("btnGenerarWASites");
+if (btnGenerarWASites) {
+    btnGenerarWASites.addEventListener("click", function() {
+        if (!datosEvolucionSitesParaWA || !datosEvolucionSitesParaWA.santaAna) {
+            alert("No hay datos de evolución por site para generar el reporte.");
+            return;
+        }
+
+        var sa = datosEvolucionSitesParaWA.santaAna;
+        var se = datosEvolucionSitesParaWA.santaElena;
+
+        var texto = "*Detalle de evolución por Site:*\n\n";
+
+        // --- SANTA ANA ---
+        texto += "📍 *Santa Ana* (" + sa.totalEncuestas + " encuestas):\n";
+        if (sa.enMeta > 0) {
+            texto += "✅ " + sa.enMeta + (sa.enMeta === 1 ? " hora en meta\n" : " horas en meta\n");
+        }
+        if (sa.fueraMeta > 0) {
+            texto += "🚨 " + sa.fueraMeta + (sa.fueraMeta === 1 ? " hora fuera de meta" : " horas fuera de meta");
+            if (sa.peoresNotas.length === 1) {
+                texto += ", con nota *" + sa.peoresNotas[0].valor.toFixed(2) + "* como la más baja a las " + sa.peoresNotas[0].hora + " hrs.\n";
+            } else if (sa.peoresNotas.length >= 2) {
+                texto += ", con notas *" + sa.peoresNotas[0].valor.toFixed(2) + "* y *" + sa.peoresNotas[1].valor.toFixed(2) + "* como las más bajas a las " + sa.peoresNotas[0].hora + " y " + sa.peoresNotas[1].hora + " hrs.\n";
+            } else {
+                texto += ".\n";
+            }
+        } else if (sa.enMeta > 0) {
+            texto += "🎉 ¡Todas las horas se mantuvieron en meta!\n";
+        }
+        texto += "\n"; // Espacio entre sites
+
+        // --- SANTA ELENA ---
+        texto += "📍 *Santa Elena* (" + se.totalEncuestas + " encuestas):\n";
+        if (se.enMeta > 0) {
+            texto += "✅ " + se.enMeta + (se.enMeta === 1 ? " hora en meta\n" : " horas en meta\n");
+        }
+        if (se.fueraMeta > 0) {
+            texto += "🚨 " + se.fueraMeta + (se.fueraMeta === 1 ? " hora fuera de meta" : " horas fuera de meta");
+            if (se.peoresNotas.length === 1) {
+                texto += ", con nota *" + se.peoresNotas[0].valor.toFixed(2) + "* como la más baja a las " + se.peoresNotas[0].hora + " hrs.\n";
+            } else if (se.peoresNotas.length >= 2) {
+                texto += ", con notas *" + se.peoresNotas[0].valor.toFixed(2) + "* y *" + se.peoresNotas[1].valor.toFixed(2) + "* como las más bajas a las " + se.peoresNotas[0].hora + " y " + se.peoresNotas[1].hora + " hrs.\n";
+            } else {
+                texto += ".\n";
+            }
+        } else if (se.enMeta > 0) {
+            texto += "🎉 ¡Todas las horas se mantuvieron en meta!\n";
+        }
+
+        texto += "\n━━━━━━━━━━━━━━━━━━━━\n";
+        texto += "*Quedamos atentos a sus comentarios.*";
+
+        // Mostrar en el modal
+        document.getElementById("waTextArea").value = texto;
+        document.getElementById("modalWABackdrop").classList.add("visible");
+    });
+}
 
     modalWAClose.addEventListener("click", function() {
         modalWABackdrop.classList.remove("visible");
